@@ -1,0 +1,22 @@
+const pad = (n: number) => String(n).padStart(2, '0');
+export const toKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+export const todayKey = () => toKey(new Date());
+export const parseKey = (k: string) => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+export const addDays = (k: string, n: number) => { const d = parseKey(k); d.setDate(d.getDate() + n); return toKey(d); };
+export const monthOf = (k: string) => k.slice(0, 7);
+export const addMonths = (m: string, n: number) => { const [y, mo] = m.split('-').map(Number); const d = new Date(y, mo - 1 + n, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+export const daysInMonth = (m: string) => { const [y, mo] = m.split('-').map(Number); return new Date(y, mo, 0).getDate(); };
+export const monthStartDow = (m: string) => { const [y, mo] = m.split('-').map(Number); return new Date(y, mo - 1, 1).getDay(); };
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+export const monthLabel = (m: string) => { const [y, mo] = m.split('-').map(Number); return `${MONTHS[mo - 1]} ${y}`; };
+export const monthShort = (m: string) => MONTHS[Number(m.slice(5, 7)) - 1];
+export const dayLabel = (k: string) => { const d = parseKey(k); return `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}`; };
+export const shortDate = (k: string) => { const d = parseKey(k); return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}`; };
+export const niceDay = (k: string) => {
+  const t = todayKey();
+  if (k === t) return 'Today';
+  if (k === addDays(t, -1)) return 'Yesterday';
+  if (k === addDays(t, 1)) return 'Tomorrow';
+  return dayLabel(k);
+};
