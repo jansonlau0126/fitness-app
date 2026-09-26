@@ -338,3 +338,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .credit a, .card a { color: var(--accent); }
 .eq-icon { color: var(--accent); background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 16%, var(--card2)), var(--card2)); width: 56px; height: 56px; }
 .eq-icon .eq-svg { width: 38px; height: 38px; }
+.tr { grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; }
+.tr > span:nth-child(2), .tr > span:nth-child(3) { white-space: nowrap; }
+.tr > span:nth-child(2) { font-size: 13.5px; }
+.tr-ex { gap: 8px; }
+.tr-ex b { font-size: 14px; }
+.tr.th > span { font-size: 12px !important; }
