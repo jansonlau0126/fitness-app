@@ -35,7 +35,8 @@ async function addEntry(part, exName, sets) {
   await tab('Log');
   await p.click('button:has-text("Add exercise")');
   await p.selectOption('.sheet select >> nth=0', { label: part });
-  await p.selectOption('.sheet select >> nth=1', { label: exName });
+  if (part === 'Chest' && !globalThis.__pickerShot) { globalThis.__pickerShot = true; await shot('10-picker-images.png'); }
+  await p.locator('.sheet .ex-opt', { has: p.locator('.ex-opt-name', { hasText: new RegExp('^' + exName.replace(/[()]/g, '\\$&') + '$') }) }).click();
   for (let i = 0; i < sets.length; i++) {
     const rows = await p.locator('.sheet .set-row:not(.head)').count();
     if (i >= rows) await p.click('.sheet button:has-text("Add set")');
@@ -60,6 +61,9 @@ await shot('02-today-log.png', true);
 await tab('Summary');
 await shot('03-day-summary.png', true);
 await shot('03a-day-summary-phone.png');
+await p.locator('.table').scrollIntoViewIfNeeded();
+await p.evaluate(() => window.scrollBy(0, -60));
+await shot('11-summary-images.png');
 await p.locator('.body-map').first().screenshot({ path: OUT + '03b-body-diagram.png' });
 
 await tab('Profile');
@@ -81,9 +85,14 @@ await p.click('button[aria-label="Previous month"]');
 await shot('05b-month-previous.png', true);
 
 await tab('Library');
-await p.click('.ex-head >> nth=0');
+await shot('12-library-images.png');
+await p.click('.ex-head .entry-name >> nth=0');
 await shot('06-library.png');
+await p.click('.ex-photos');
+await shot('14-lightbox.png');
+await p.click('.lightbox button[aria-label="Close"]');
 await p.click('.seg button:has-text("Equipment")');
+await shot('13-equipment-images.png');
 await shot('07-equipment.png');
 
 // light theme check

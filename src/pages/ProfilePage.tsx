@@ -5,6 +5,7 @@ import { KEY_LIFTS } from '../data/exercises';
 import { fmt, LEVEL_COLORS, LEVELS, strengthResults } from '../lib/calc';
 import { shortDate, todayKey } from '../lib/date';
 import { makeDemo } from '../lib/demo';
+import { PHOTO_CREDIT, PHOTO_CREDIT_URL } from '../data/images';
 import { actions, normalize, useData, type Theme } from '../lib/store';
 
 export default function ProfilePage() {
@@ -114,6 +115,11 @@ export default function ProfilePage() {
             if (await confirmDialog('Delete ALL workouts, profile and custom exercises? This cannot be undone.', { title: 'Clear all data', ok: 'Delete all', danger: true })) { actions.clearAll(); toast('All data cleared'); }
           }}>🗑️ Clear all data</button>
         </div>
+      </section>
+      <section className="card">
+        <h2 className="card-title">About</h2>
+        <p className="small muted">Strength standards based on strengthlevel.com data.</p>
+        <p className="small muted">{PHOTO_CREDIT} <a href={PHOTO_CREDIT_URL} target="_blank" rel="noopener noreferrer">github.com/yuhonas/free-exercise-db</a>. Equipment icons and body map drawn for this app.</p>
       </section>
       <p className="center-text small muted">Fitness Log · made for Janson 🇭🇰</p>
     </div>

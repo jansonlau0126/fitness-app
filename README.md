@@ -27,3 +27,9 @@ npm run shots      # phone-size screenshots into screenshots/ (needs preview run
 (`/strength-standards/<lift>/kg`, fetched 25 Sep 2026, data cutoff 10 Mar 2026). Values are interpolated
 between bodyweight rows (clamped at the ends). Body-weight lifts (pull-ups, dips, push-ups…) use the reps tables.
 Dumbbell standards are for the weight of one dumbbell.
+
+## Pictures & credits
+- Exercise photos (start/end, 104 of 106 exercises): [free-exercise-db](https://github.com/yuhonas/free-exercise-db) by yuhonas,
+  public domain under **The Unlicense**. Resized to 240 px WebP (~0.9 MB total) and bundled in `public/ex/` (no hotlinking).
+  Mapping: `src/data/images.ts`.
+- Equipment icons and fallback exercise icons (`src/components/Icons.tsx`) and the body map are drawn for this app.

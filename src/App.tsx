@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Hosts } from './components/ui';
+import { LightboxHost } from './components/Thumb';
 import { EntryEditor } from './pages/LogPage';
 import LogPage from './pages/LogPage';
 import DayPage from './pages/DayPage';
@@ -58,6 +59,7 @@ export default function App() {
         ))}
       </nav>
       {quickEx && <EntryEditor entry={null} date={todayKey()} presetEx={quickEx} onClose={() => { setQuickEx(null); }} />}
+      <LightboxHost />
       <Hosts />
     </div>
   );

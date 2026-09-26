@@ -3,6 +3,7 @@ import { DateBar, Empty, Stat } from '../components/ui';
 import { muscleName, partLabel } from '../data/exercises';
 import { daySummary, entryStats, exMap, fmt, fmtInt, prsOn } from '../lib/calc';
 import { useData } from '../lib/store';
+import { ExThumb } from '../components/Thumb';
 
 export default function DayPage({ date, setDate, goLog }: { date: string; setDate: (d: string) => void; goLog: () => void }) {
   const data = useData();
@@ -58,7 +59,7 @@ export default function DayPage({ date, setDate, goLog }: { date: string; setDat
                 const ex = m.get(en.exId); const st = entryStats(en);
                 return (
                   <div className="tr" key={en.id}>
-                    <span><b>{ex?.name}</b><small className="muted"> {ex ? partLabel(ex.part) : ''} · {st.sets} sets</small></span>
+                    <span className="tr-ex">{ex && <ExThumb ex={ex} size={44} />}<span><b>{ex?.name}</b><small className="muted"> {ex ? partLabel(ex.part) : ''} · {st.sets} sets</small></span></span>
                     <span>{st.bestSet ? `${st.bestSet.w ? fmt(st.bestSet.w) + ' kg' : 'BW'} × ${st.bestSet.r}` : '–'}</span>
                     <span className="strong">{ex?.bw ? `${st.maxReps} reps` : `${fmt(st.best)} kg`}</span>
                   </div>

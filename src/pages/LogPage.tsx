@@ -5,6 +5,7 @@ import { actions, uid, useData, type LogEntry, type SetEntry } from '../lib/stor
 import { allExercises, bestByExercise, e1rm, entriesOn, entryStats, exMap, fmt, fmtInt, metricOf } from '../lib/calc';
 import { addDays, shortDate } from '../lib/date';
 import { confirmDialog, DateBar, Empty, NumberField, Sheet, toast } from '../components/ui';
+import { ExThumb } from '../components/Thumb';
 
 export default function LogPage({ date, setDate, goSummary }: { date: string; setDate: (d: string) => void; goSummary: () => void }) {
   const data = useData();
@@ -33,7 +34,8 @@ export default function LogPage({ date, setDate, goSummary }: { date: string; se
             return (
               <button className="card entry" key={en.id} onClick={() => setEditing(en)}>
                 <div className="entry-top">
-                  <div>
+                  {ex && <ExThumb ex={ex} size={48} />}
+                  <div className="grow">
                     <div className="entry-name">{ex?.name ?? 'Unknown exercise'}</div>
                     <div className="muted small">{ex ? partLabel(ex.part) : ''} · {st.sets} {st.sets === 1 ? 'set' : 'sets'} · {st.reps} reps{st.volume > 0 && ` · ${fmtInt(st.volume)} kg`}</div>
                   </div>
@@ -75,6 +77,7 @@ export function EntryEditor({ entry, date, onClose, presetEx }: { entry: LogEntr
   const initEx = entry ? m.get(entry.exId) : presetEx ? m.get(presetEx) : undefined;
   const [part, setPart] = useState<BodyPart | ''>(initEx?.part ?? '');
   const [exId, setExId] = useState<string>(initEx?.id ?? '');
+  const [picking, setPicking] = useState(!initEx);
   const [sets, setSets] = useState<{ w: number | null; r: number | null }[]>(entry ? entry.sets.map((s) => ({ ...s })) : [{ w: null, r: null }]);
   const ex: Exercise | undefined = m.get(exId);
   const list = all.filter((e) => e.part === part).sort((a, b) => a.name.localeCompare(b.name));
@@ -82,6 +85,7 @@ export function EntryEditor({ entry, date, onClose, presetEx }: { entry: LogEntr
 
   const pickEx = (id: string) => {
     setExId(id);
+    setPicking(false);
     if (!entry) {
       const lt = lastTime(data.entries, id, date);
       const e = m.get(id);
@@ -119,27 +123,45 @@ export function EntryEditor({ entry, date, onClose, presetEx }: { entry: LogEntr
     }>
       <label className="field">
         <span className="field-label">1. Body part</span>
-        <select value={part} onChange={(e) => { setPart(e.target.value as BodyPart); setExId(''); }}>
+        <select value={part} onChange={(e) => { setPart(e.target.value as BodyPart); setExId(''); setPicking(true); }}>
           <option value="" disabled>Choose body part…</option>
           {BODY_PARTS.map((p) => <option key={p} value={p}>{partLabel(p)}</option>)}
         </select>
       </label>
-      <label className="field">
-        <span className="field-label">2. Exercise</span>
-        <select value={exId} disabled={!part} onChange={(e) => pickEx(e.target.value)}>
-          <option value="" disabled>{part ? 'Choose exercise…' : 'Pick a body part first'}</option>
-          {list.map((e) => <option key={e.id} value={e.id}>{e.name}{e.custom ? ' (my)' : ''}</option>)}
-        </select>
-      </label>
-      {ex && (
+      <div className="field">
+        <span className="field-label">2. Exercise {part && (picking || !ex) && <span className="muted">· {list.length} choices, scroll ↓</span>}</span>
+        {!part ? (
+          <div className="pick-empty">Pick a body part first</div>
+        ) : ex && !picking ? (
+          <div className="ex-picked">
+            <ExThumb ex={ex} size={64} />
+            <div className="grow">
+              <div className="entry-name">{ex.name}</div>
+              <div className="muted small">{equipName(ex.equipment)} · tap photo to zoom</div>
+            </div>
+            <button className="btn small ghost" onClick={() => setPicking(true)}>Change</button>
+          </div>
+        ) : (
+          <div className="ex-pick" role="listbox" aria-label="Choose exercise">
+            {list.map((e) => (
+              <button key={e.id} role="option" aria-selected={e.id === exId} className={`ex-opt ${e.id === exId ? 'on' : ''}`} onClick={() => pickEx(e.id)}>
+                <ExThumb ex={e} size={48} zoom={false} />
+                <span className="grow"><span className="ex-opt-name">{e.name}{e.custom ? ' (my)' : ''}</span><span className="muted small">{equipName(e.equipment)}</span></span>
+                <span className="chev">›</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {ex && (ex.bw || ex.equipment === 'dumbbell' || last) && (
         <div className="hint">
-          <span>🧰 {equipName(ex.equipment)}</span>
           {ex.bw && <span>Body weight move: put 0 kg, or extra kg you add.</span>}
           {ex.equipment === 'dumbbell' && <span>Put the weight of ONE dumbbell.</span>}
           {last && <span>Last time ({shortDate(last.date)}): {last.sets.map((s) => `${s.w ? fmt(s.w) + '×' : ''}${s.r}`).join(', ')}</span>}
         </div>
       )}
 
+      {ex && <>
       <div className="sets-head">
         <h3>3. Sets <span className="pill">{sets.length}</span></h3>
         <span className="muted small">{ex?.bw ? 'Best reps' : 'Est. 1RM'}</span>
@@ -161,6 +183,7 @@ export function EntryEditor({ entry, date, onClose, presetEx }: { entry: LogEntr
       </div>
       <button className="btn ghost wide" onClick={addSet}>＋ Add set</button>
       <p className="muted small note">Est. 1RM = estimated one-rep max (Epley formula: kg × (1 + reps ÷ 30)). It is a guess, not a real test.</p>
+      </>}
     </Sheet>
   );
 }

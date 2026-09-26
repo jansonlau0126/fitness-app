@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react';
 import BodyMap from '../components/BodyMap';
+import { EquipIcon } from '../components/Icons';
+import { ExPhotos, ExThumb } from '../components/Thumb';
+import { PHOTO_CREDIT, PHOTO_CREDIT_URL } from '../data/images';
 import { confirmDialog, Segmented, Sheet, toast } from '../components/ui';
 import { BODY_PARTS, MUSCLES, muscleName, PART_MUSCLE, partLabel, type BodyPart, type EquipId, type Exercise, type Muscle } from '../data/exercises';
 import { EQUIPMENT, equipName } from '../data/equipment';
@@ -44,6 +47,7 @@ export default function LibraryPage({ onLog }: { onLog: (exId: string) => void }
                   return (
                     <div className={`card ex ${isOpen ? 'open' : ''}`} key={e.id}>
                       <button className="ex-head" onClick={() => setOpen(isOpen ? null : e.id)} aria-expanded={isOpen}>
+                        <ExThumb ex={e} size={52} />
                         <div className="grow">
                           <div className="entry-name">{e.name} {e.custom && <span className="pill">my</span>}</div>
                           <div className="muted small">{e.primary.map(muscleName).join(', ')} · {equipName(e.equipment)}</div>
@@ -64,7 +68,7 @@ export default function LibraryPage({ onLog }: { onLog: (exId: string) => void }
           <p className="muted small">Basic gym tools, in simple words.</p>
           {EQUIPMENT.map((q) => (
             <div className="card eq" key={q.id}>
-              <div className="eq-icon">{q.icon}</div>
+              <div className="eq-icon"><EquipIcon id={q.id} /></div>
               <div className="grow">
                 <h3>{q.name}</h3>
                 {q.text.map((t, i) => <p key={i}>{t}</p>)}
@@ -74,6 +78,7 @@ export default function LibraryPage({ onLog }: { onLog: (exId: string) => void }
           ))}
         </div>
       )}
+      <p className="credit center-text">{PHOTO_CREDIT} <a href={PHOTO_CREDIT_URL} target="_blank" rel="noopener noreferrer">Source</a>. Icons drawn for this app.</p>
       {adding && <CustomForm onClose={() => setAdding(false)} />}
     </div>
   );
@@ -92,6 +97,7 @@ function ExDetail({ e, onLog }: { e: Exercise; onLog: () => void }) {
           <div className="small">{equipName(e.equipment)}{e.bw ? ' (body weight)' : ''}</div>
         </div>
       </div>
+      <ExPhotos ex={e} />
       <div className="field-label">How to do it</div>
       <ol className="how">{e.how.map((h, i) => <li key={i}>{h}</li>)}</ol>
       {e.std && <p className="small muted">📊 Has strength standards (see Profile).</p>}
