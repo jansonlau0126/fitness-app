@@ -1,5 +1,5 @@
 // Simple offline cache. Network first for pages, cache first for files.
-const CACHE = 'fitness-log-v2'; // bump this on each release so old caches are dropped
+const CACHE = 'fitness-log-v3'; // bump this on each release so old caches are dropped
 self.addEventListener('install', (e) => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './index.html', './manifest.webmanifest', './icon.svg']))); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {
