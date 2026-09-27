@@ -56,7 +56,7 @@ export default function ProfilePage() {
         <h2 className="card-title">Body weight history</h2>
         <div className="row gap wrap-row">
           <input type="date" value={wDate} onChange={(e) => setWDate(e.target.value)} aria-label="Weight date" className="grow" />
-          <NumberField value={wKg} onChange={setWKg} placeholder="kg" suffix="kg" className="w90" />
+          <NumberField value={wKg} onChange={setWKg} placeholder="0" suffix="kg" className="w90" />
           <button className="btn primary" disabled={!wKg} onClick={() => { if (wKg) { actions.addWeight({ date: wDate, kg: wKg }); setWKg(null); toast('Weight saved ✓'); } }}>Add</button>
         </div>
         {data.weights.length >= 2 && <Sparkline points={data.weights.map((w) => ({ x: w.date, y: w.kg }))} />}
