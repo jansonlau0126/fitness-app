@@ -3,7 +3,7 @@ import { BarList, LineChart, MonthCalendar, type Series } from '../components/Ch
 import { Segmented, Stat } from '../components/ui';
 import { BODY_PARTS, KEY_LIFTS, partLabel, type BodyPart } from '../data/exercises';
 import { bestByExercise, entryStats, exMap, fmt, fmtInt, LEVEL_COLORS, LEVELS, strengthResults } from '../lib/calc';
-import { addDays, addMonths, daysInMonth, monthLabel, monthOf, monthShort, todayKey } from '../lib/date';
+import { addDays, addMonths, daysInMonth, monthLabel, monthOf, monthShort, todayKey, weekKey, weeksInMonth } from '../lib/date';
 import { useData, type AppData } from '../lib/store';
 
 const COLORS = ['#ff6b3d', '#60a5fa', '#34d399', '#fbbf24', '#c084fc'];
@@ -87,13 +87,13 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
   const chartTo = mEnd > todayKey() && mStart <= todayKey() ? todayKey() : mEnd;
   const chartable = useMemo(() => {
     const count = new Map<string, number>();
-    for (const e of data.entries) if (e.date >= chartFrom && e.date <= mEnd && !m.get(e.exId)?.bw) count.set(e.exId, (count.get(e.exId) ?? 0) + e.sets.length);
+    for (const e of data.entries) if (e.date >= chartFrom && e.date <= chartTo && !m.get(e.exId)?.bw) count.set(e.exId, (count.get(e.exId) ?? 0) + e.sets.length);
     return [...count.entries()].sort((a, b) => (KEY_LIFTS.includes(b[0]) ? 1000 : 0) + b[1] - ((KEY_LIFTS.includes(a[0]) ? 1000 : 0) + a[1])).map(([id]) => id);
-  }, [data, chartFrom, mEnd, m]);
+  }, [data, chartFrom, chartTo, m]);
   const sel = (picked ?? chartable.slice(0, 3)).filter((id) => chartable.includes(id));
   const series: Series[] = sel.map((id, i) => {
     const best = new Map<string, number>();
-    for (const e of data.entries) if (e.exId === id && e.date >= chartFrom && e.date <= mEnd) { const v = entryStats(e).best; if (v > (best.get(e.date) ?? 0)) best.set(e.date, v); }
+    for (const e of data.entries) if (e.exId === id && e.date >= chartFrom && e.date <= chartTo) { const v = entryStats(e).best; if (v > (best.get(e.date) ?? 0)) best.set(e.date, v); }
     return { name: m.get(id)?.name ?? id, color: COLORS[i % COLORS.length], points: [...best.entries()].map(([x, y]) => ({ x, y })) };
   });
   const toggle = (id: string) => setPicked((p) => { const s = p ?? sel; return s.includes(id) ? s.filter((x) => x !== id) : [...s, id].slice(-5); });
@@ -116,7 +116,9 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
     if (prev.volume > 0 && cur.volume > prev.volume) msgs.push(`Your total volume went up ${Math.round(((cur.volume - prev.volume) / prev.volume) * 100)}% from last month. 📈`);
   }
 
-  const weeksWithTraining = new Set([...cur.days.keys()].map((d) => Math.floor((Number(d.slice(8)) - 1) / 7))).size;
+  const monthWeeks = weeksInMonth(month);
+  const trainedWeekKeys = new Set([...cur.days.keys()].map(weekKey));
+  const everyWeek = monthWeeks.length > 0 && monthWeeks.every((w) => trainedWeekKeys.has(w));
   const badges = [
     { icon: '👟', name: 'First step', desc: '1+ workout', ok: nDays >= 1 },
     { icon: '📆', name: 'Regular', desc: '8+ days', ok: nDays >= 8 },
@@ -126,7 +128,7 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
     { icon: '🐘', name: 'Heavy lifter', desc: '50,000 kg', ok: cur.volume >= 50000 },
     { icon: '🧍', name: 'Full body', desc: '8+ body parts', ok: cur.parts.size >= 8 },
     { icon: '⭐', name: 'Level up', desc: 'New strength level', ok: ups.length > 0 },
-    { icon: '🗓️', name: 'Every week', desc: 'All 4 weeks', ok: weeksWithTraining >= 4 },
+    { icon: '🗓️', name: 'Every week', desc: 'Train each week', ok: everyWeek },
   ];
   const earned = badges.filter((b) => b.ok).length;
 

@@ -20,3 +20,19 @@ export const niceDay = (k: string) => {
   if (k === addDays(t, 1)) return 'Tomorrow';
   return dayLabel(k);
 };
+
+/** Monday-start week key (YYYY-MM-DD of that Monday) for calendar-week badges. */
+export const weekKey = (k: string) => {
+  const d = parseKey(k);
+  const monOffset = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - monOffset);
+  return toKey(d);
+};
+
+/** Distinct Monday-start weeks that overlap a calendar month. */
+export const weeksInMonth = (m: string) => {
+  const n = daysInMonth(m);
+  const keys = new Set<string>();
+  for (let i = 1; i <= n; i++) keys.add(weekKey(`${m}-${pad(i)}`));
+  return [...keys];
+};

@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { Exercise } from '../data/exercises';
+import { toast } from '../components/ui';
 
 export interface SetEntry { w: number; r: number }
 export interface LogEntry { id: string; date: string; exId: string; sets: SetEntry[]; t: number }
@@ -38,10 +39,15 @@ export function normalize(x: unknown): AppData {
   if (!x || typeof x !== 'object') throw new Error('Not a valid backup file.');
   const o = x as Partial<AppData>;
   if (!Array.isArray(o.entries)) throw new Error('Not a valid backup file (no workouts found).');
+  const weights = Array.isArray(o.weights)
+    ? o.weights
+      .filter((w) => w && typeof w.kg === 'number' && typeof w.date === 'string')
+      .sort((a, b) => a.date.localeCompare(b.date))
+    : [];
   return {
     ...e,
     profile: { ...e.profile, ...(o.profile ?? {}) },
-    weights: Array.isArray(o.weights) ? o.weights.filter((w) => w && typeof w.kg === 'number' && typeof w.date === 'string') : [],
+    weights,
     entries: o.entries
       .filter((en) => en && typeof en.date === 'string' && typeof en.exId === 'string' && Array.isArray(en.sets))
       .map((en) => ({ id: String(en.id ?? uid()), date: en.date, exId: en.exId, t: Number(en.t) || Date.now(),
@@ -53,16 +59,48 @@ export function normalize(x: unknown): AppData {
 
 let state: AppData = load();
 const listeners = new Set<() => void>();
+function notify() { listeners.forEach((l) => l()); }
 function emit() {
-  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* storage full */ }
-  listeners.forEach((l) => l());
+  try {
+    localStorage.setItem(KEY, JSON.stringify(state));
+  } catch {
+    toast('Could not save — storage full. Export a backup.');
+    return false;
+  }
+  notify();
+  return true;
 }
-export function setData(fn: (d: AppData) => AppData) { state = fn(state); emit(); }
+export function setData(fn: (d: AppData) => AppData) {
+  const prev = state;
+  state = fn(state);
+  if (!emit()) {
+    state = prev;
+    notify();
+  }
+}
 export function getData() { return state; }
 export function useData(): AppData {
   return useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, () => state);
 }
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+
+// Keep tabs/webviews in sync when another one writes localStorage.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key !== KEY) return;
+    try {
+      state = e.newValue ? normalize(JSON.parse(e.newValue)) : emptyData();
+    } catch {
+      return;
+    }
+    notify();
+  });
+}
+
+function syncWeightFromHistory(weights: WeightLog[], profile: Profile): Profile {
+  const latest = weights[weights.length - 1];
+  return { ...profile, weightKg: latest ? latest.kg : null };
+}
 
 export const actions = {
   saveEntry(en: LogEntry) {
@@ -76,11 +114,15 @@ export const actions = {
   addWeight(w: WeightLog) {
     setData((d) => {
       const weights = [...d.weights.filter((x) => x.date !== w.date), w].sort((a, b) => a.date.localeCompare(b.date));
-      const latest = weights[weights.length - 1];
-      return { ...d, weights, profile: { ...d.profile, weightKg: latest ? latest.kg : d.profile.weightKg } };
+      return { ...d, weights, profile: syncWeightFromHistory(weights, d.profile) };
     });
   },
-  deleteWeight(date: string) { setData((d) => ({ ...d, weights: d.weights.filter((x) => x.date !== date) })); },
+  deleteWeight(date: string) {
+    setData((d) => {
+      const weights = d.weights.filter((x) => x.date !== date);
+      return { ...d, weights, profile: syncWeightFromHistory(weights, d.profile) };
+    });
+  },
   addCustom(ex: Exercise) { setData((d) => ({ ...d, custom: [...d.custom, { ...ex, custom: true }] })); },
   deleteCustom(id: string) { setData((d) => ({ ...d, custom: d.custom.filter((c) => c.id !== id), entries: d.entries.filter((e) => e.exId !== id) })); },
   setTheme(theme: Theme) { setData((d) => ({ ...d, settings: { ...d.settings, theme } })); },

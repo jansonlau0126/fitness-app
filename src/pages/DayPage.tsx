@@ -56,7 +56,7 @@ export default function DayPage({ date, setDate, goLog }: { date: string; setDat
             <div className="table">
               <div className="tr th"><span>Exercise</span><span>Best set</span><span>Est. 1RM</span></div>
               {s.entries.map((en) => {
-                const ex = m.get(en.exId); const st = entryStats(en);
+                const ex = m.get(en.exId); const st = entryStats(en, !!ex?.bw);
                 return (
                   <div className="tr" key={en.id}>
                     <span className="tr-ex">{ex && <ExThumb ex={ex} size={40} />}<span><b>{ex?.name}</b><small className="muted"> {ex ? partLabel(ex.part) : ''} · {st.sets} sets</small></span></span>

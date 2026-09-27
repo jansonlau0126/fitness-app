@@ -26,13 +26,19 @@ export function exMap(d: AppData): Map<string, Exercise> {
 }
 
 export interface EntryStats { sets: number; reps: number; volume: number; best: number; bestSet: SetEntry | null; maxReps: number }
-export function entryStats(en: LogEntry): EntryStats {
+/** Stats for one logged exercise. Pass `bw` so “best set” matches the PR metric (max reps). */
+export function entryStats(en: LogEntry, bw = false): EntryStats {
   let reps = 0, volume = 0, best = 0, maxReps = 0; let bestSet: SetEntry | null = null;
   for (const s of en.sets) {
     reps += s.r; volume += s.w * s.r;
     const e = e1rm(s.w, s.r);
-    if (e > best) { best = e; bestSet = s; }
+    if (e > best) best = e;
     if (s.r > maxReps) maxReps = s.r;
+    if (bw) {
+      if (!bestSet || s.r > bestSet.r || (s.r === bestSet.r && s.w > bestSet.w)) bestSet = s;
+    } else if (e > (bestSet ? e1rm(bestSet.w, bestSet.r) : 0)) {
+      bestSet = s;
+    }
   }
   if (!bestSet && en.sets.length) bestSet = en.sets.reduce((a, b) => (b.r > a.r ? b : a));
   return { sets: en.sets.length, reps, volume, best, bestSet, maxReps };
@@ -65,7 +71,8 @@ export function bestByExercise(d: AppData, from = '0000-00-00', to = '9999-99-99
   const out = new Map<string, { value: number; date: string; set: SetEntry | null }>();
   for (const en of d.entries) {
     if (en.date < from || en.date > to) continue;
-    const st = entryStats(en); const v = metricOf(m.get(en.exId), st);
+    const ex = m.get(en.exId);
+    const st = entryStats(en, !!ex?.bw); const v = metricOf(ex, st);
     const cur = out.get(en.exId);
     if (v > 0 && (!cur || v > cur.value)) out.set(en.exId, { value: v, date: en.date, set: st.bestSet });
   }

@@ -47,7 +47,7 @@ main { padding: calc(env(safe-area-inset-top) + 8px) 16px calc(96px + env(safe-a
 .stack { display: flex; flex-direction: column; gap: 10px; }
 .row { display: flex; align-items: center; }
 .gap { gap: 10px; } .end { justify-content: flex-end; } .grow { flex: 1; min-width: 0; }
-.wrap-row { flex-wrap: nowrap; }
+.wrap-row { flex-wrap: wrap; }
 .muted { color: var(--muted); } .small { font-size: 13.5px; } .strong { font-weight: 700; } .fg { color: var(--fg); } .accent { color: var(--accent); }
 .center-text { text-align: center; }
 .note { margin-top: 10px; line-height: 1.35; }
