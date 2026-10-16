@@ -15,7 +15,7 @@ const PLAN: Record<number, P[]> = {
     ['lying-leg-curl', 30, 40, 12, 3], ['calf-raise', 60, 80, 12, 3], ['hanging-leg-raise', 0, 0, 8, 3, 12]],
   6: [ // Saturday – upper
     ['dumbbell-bench-press', 22, 28, 8, 3], ['lat-pulldown', 50, 62.5, 10, 3], ['dips', 0, 0, 8, 3, 12],
-    ['seated-cable-row', 50, 60, 10, 3], ['hammer-curl', 12, 16, 10, 3], ['cable-crunch', 30, 40, 12, 3]],
+    ['seated-cable-row', 50, 60, 10, 3], ['hammer-curl', 12, 16, 10, 3], ['cable-crunch', 30, 40, 12, 3], ['plank', 0, 0, 45, 3, 75]],
 };
 
 const SKIP = new Set([12, 26, 36]);
@@ -39,7 +39,11 @@ export function makeDemo(): AppData {
       const step = a < 30 ? (a < 15 ? 1 : 2) : 2.5;
       const w = a === 0 ? 0 : round(a + (b - a) * t + (r() - 0.5) * step, step);
       const baseReps = repsEnd ? Math.round(reps + (repsEnd - reps) * t) : reps;
-      const s = Array.from({ length: sets }, (_, k) => ({ w, r: Math.max(1, baseReps - (k === sets - 1 && r() < 0.4 ? 1 : 0) - (repsEnd && k > 0 ? k : 0)) }));
+      const DUR = new Set(['plank', 'side-plank', 'wall-sit', 'dead-hang']);
+      const s = Array.from({ length: sets }, (_, k) => {
+        const val = Math.max(1, baseReps - (k === sets - 1 && r() < 0.4 ? 1 : 0) - (repsEnd && k > 0 ? k : 0));
+        return DUR.has(exId) ? { w: 0, r: 0, sec: val } : { w, r: val };
+      });
       entries.push({ id: uid(), date, exId, sets: s, t: parseKey(date).getTime() + 18 * 3600e3 + n++ * 60e3 });
     }
   }

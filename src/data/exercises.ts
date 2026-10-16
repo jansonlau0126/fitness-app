@@ -43,6 +43,8 @@ export type EquipId =
   | 'barbell' | 'ez-bar' | 'trap-bar' | 'dumbbell' | 'kettlebell' | 'cable' | 'smith'
   | 'machine' | 'leg-press' | 'pullup-bar' | 'dip-bars' | 'band' | 'bench' | 'ab-wheel' | 'bodyweight';
 
+export type Tracking = 'weight_reps' | 'reps' | 'duration';
+
 export interface Exercise {
   id: string;
   name: string;
@@ -51,16 +53,22 @@ export interface Exercise {
   secondary: Muscle[];
   equipment: EquipId;
   how: string[];
-  bw?: boolean; // body weight move: weight box = extra weight
-  std?: string; // key in STANDARDS
+  /** @deprecated prefer tracking === 'reps' */
+  bw?: boolean;
+  tracking: Tracking;
+  std?: string;
   custom?: boolean;
 }
 
-type Opt = { bw?: boolean; std?: string | false };
+type Opt = { bw?: boolean; tracking?: Tracking; std?: string | false };
 function ex(id: string, name: string, part: BodyPart, primary: Muscle[], secondary: Muscle[], equipment: EquipId, how: string[], o: Opt = {}): Exercise {
   const std = o.std === false ? undefined : o.std ?? (STANDARDS[id] ? id : undefined);
-  return { id, name, part, primary, secondary, equipment, how, bw: o.bw, std };
+  const tracking: Tracking = o.tracking ?? (o.bw ? 'reps' : 'weight_reps');
+  return { id, name, part, primary, secondary, equipment, how, bw: tracking === 'reps' || o.bw, tracking, std };
 }
+
+export const trackingOf = (ex: Exercise | undefined): Tracking =>
+  ex?.tracking ?? (ex?.bw ? 'reps' : 'weight_reps');
 
 export const EXERCISES: Exercise[] = [
   // CHEST
@@ -518,6 +526,28 @@ export const EXERCISES: Exercise[] = [
     'Lie face down, arms forward.',
     'Lift your arms and legs off the floor.',
     'Hold for a moment, then lower.'], { bw: true }),
+  // TIMED / ISOMETRIC
+  ex('plank', 'Plank', 'Abs', ['abs'], ['shoulders'], 'bodyweight', [
+    'Lie face down, then lift onto forearms and toes.',
+    'Keep your body in a straight line — no sagging hips.',
+    'Hold. Log time in seconds.',
+    'Too hard? Drop to your knees.'], { tracking: 'duration' }),
+  ex('side-plank', 'Side Plank', 'Abs', ['obliques'], ['shoulders', 'abs'], 'bodyweight', [
+    'Lie on one side, elbow under your shoulder.',
+    'Lift your hips so your body is a straight line.',
+    'Hold. Log seconds. Do both sides.',
+    'Stack your feet or put the top foot in front.'], { tracking: 'duration', std: false }),
+  ex('wall-sit', 'Wall Sit', 'Quads', ['quads'], ['glutes'], 'bodyweight', [
+    'Stand with your back flat against a wall.',
+    'Slide down until your knees are at about 90 degrees.',
+    'Hold. Log time in seconds.',
+    'Knees stay over your ankles.'], { tracking: 'duration', std: false }),
+  ex('dead-hang', 'Dead Hang', 'Back', ['forearms', 'lats'], ['shoulders'], 'pullup-bar', [
+    'Hang from a pull-up bar with straight arms.',
+    'Keep your shoulders gently engaged — do not shrug up.',
+    'Hold as long as you can. Log seconds.',
+    'Add weight with a belt when it gets easy.'], { tracking: 'duration', std: false }),
+
 ];
 
 export const KEY_LIFTS = ['bench-press', 'squat', 'deadlift', 'shoulder-press', 'bent-over-row', 'pull-ups', 'dumbbell-bench-press', 'lat-pulldown'];

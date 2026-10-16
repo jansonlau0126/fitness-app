@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { addDays, niceDay, todayKey } from '../lib/date';
+import { useI18n } from '../i18n';
 
 // ---------- tiny global stores for toast + confirm ----------
 type ConfirmReq = { msg: string; title?: string; ok?: string; danger?: boolean; resolve: (v: boolean) => void };
@@ -20,7 +21,8 @@ export function toast(text: string) {
 
 export function Hosts() {
   const c = useSyncExternalStore(subscribe, () => confirmReq);
-  const t = useSyncExternalStore(subscribe, () => toastMsg);
+  const toastState = useSyncExternalStore(subscribe, () => toastMsg);
+  const { t } = useI18n();
   const done = (v: boolean) => { c?.resolve(v); confirmReq = null; ping(); };
   return (
     <>
@@ -30,13 +32,13 @@ export function Hosts() {
             {c.title && <h3>{c.title}</h3>}
             <p>{c.msg}</p>
             <div className="row gap end">
-              <button className="btn ghost" onClick={() => done(false)}>Cancel</button>
-              <button className={`btn ${c.danger ? 'danger' : 'primary'}`} onClick={() => done(true)}>{c.ok ?? 'OK'}</button>
+              <button className="btn ghost" onClick={() => done(false)}>{t('common.cancel')}</button>
+              <button className={`btn ${c.danger ? 'danger' : 'primary'}`} onClick={() => done(true)}>{c.ok ?? t('common.ok')}</button>
             </div>
           </div>
         </div>
       )}
-      {t && <div className="toast" key={t.id}>{t.text}</div>}
+      {toastState && <div className="toast" key={toastState.id}>{toastState.text}</div>}
     </>
   );
 }
@@ -65,16 +67,18 @@ export function Sheet({ title, onClose, children, footer }: { title: string; onC
 
 export function DateBar({ date, setDate }: { date: string; setDate: (d: string) => void }) {
   const today = todayKey();
+  const { t } = useI18n();
+  const label = date === today ? t('common.today') : date === addDays(today, -1) ? t('common.yesterday') : date === addDays(today, 1) ? t('common.tomorrow') : niceDay(date);
   return (
     <div className="datebar">
       <button className="icon-btn" aria-label="Previous day" onClick={() => setDate(addDays(date, -1))}>‹</button>
       <label className="datebar-mid">
-        <span className="datebar-label">{niceDay(date)}</span>
+        <span className="datebar-label">{label}</span>
         <span className="datebar-sub">{date}</span>
         <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label="Pick a date" />
       </label>
       <button className="icon-btn" aria-label="Next day" onClick={() => setDate(addDays(date, 1))}>›</button>
-      {date !== today && <button className="btn small ghost" onClick={() => setDate(today)}>Today</button>}
+      {date !== today && <button className="btn small ghost" onClick={() => setDate(today)}>{t('common.today')}</button>}
     </div>
   );
 }

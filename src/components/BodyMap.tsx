@@ -2,7 +2,6 @@ import type { Muscle } from '../data/exercises';
 
 type Region = { m: Muscle; d: string };
 
-// All paths are drawn for the LEFT half of the screen (x < 100) and mirrored.
 const OUTLINE =
   'M100,52 C95,52 91,52 90,54 C90,60 89,64 86,67 C78,70 66,71 58,74 C48,77 43,86 42,98 ' +
   'C40,112 39,128 38,142 C37,152 36,160 35,166 C32,182 29,200 28,222 C26,232 23,244 25,256 ' +
@@ -49,18 +48,43 @@ const BACK: Region[] = [
   { m: 'calves', d: 'M80,326 C79,340 79,356 81,366 C84,374 89,374 91,366 C93,352 92,338 89,326 C86,322 82,322 80,326 Z' },
 ];
 
-export interface BodyMapProps { primary: Set<Muscle>; secondary: Set<Muscle>; size?: number; showLabels?: boolean }
+export interface BodyMapProps {
+  primary: Set<Muscle>;
+  secondary: Set<Muscle>;
+  active?: Muscle | null;
+  onMuscle?: (m: Muscle, trained: boolean) => void;
+  interactive?: boolean;
+}
 
-function View({ regions, primary, secondary, back, label }: { regions: Region[]; primary: Set<Muscle>; secondary: Set<Muscle>; back?: boolean; label: string }) {
-  const cls = (m: Muscle) => (primary.has(m) ? 'mus pri' : secondary.has(m) ? 'mus sec' : 'mus');
-  // back view: 'shoulders' also lights the rear deltoid lightly, and rear-delts light the front deltoid
+function View({ regions, primary, secondary, back, label, active, onMuscle, interactive }: {
+  regions: Region[]; primary: Set<Muscle>; secondary: Set<Muscle>; back?: boolean; label: string;
+  active?: Muscle | null; onMuscle?: (m: Muscle, trained: boolean) => void; interactive?: boolean;
+}) {
+  const cls = (m: Muscle) => {
+    let c = primary.has(m) ? 'mus pri' : secondary.has(m) ? 'mus sec' : 'mus';
+    if (active === m) c += ' focus';
+    if (interactive) c += ' tap';
+    return c;
+  };
   const cls2 = (m: Muscle) => {
-    if (back && m === 'rear-delts' && !primary.has(m) && !secondary.has(m) && (primary.has('shoulders') || secondary.has('shoulders'))) return 'mus sec';
+    if (back && m === 'rear-delts' && !primary.has(m) && !secondary.has(m) && (primary.has('shoulders') || secondary.has('shoulders'))) {
+      return cls(m).replace('mus ', 'mus sec ');
+    }
     return cls(m);
   };
-  const paths = regions.map((r, i) => <path key={i} className={cls2(r.m)} d={r.d}><title>{r.m}</title></path>);
+  const hit = (m: Muscle) => {
+    if (!onMuscle) return;
+    onMuscle(m, primary.has(m) || secondary.has(m));
+  };
+  const paths = regions.map((r, i) => (
+    <path key={i} className={cls2(r.m)} d={r.d} onClick={() => hit(r.m)} role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined} onKeyDown={(e) => interactive && (e.key === 'Enter' || e.key === ' ') && hit(r.m)}>
+      <title>{r.m}</title>
+    </path>
+  ));
+  // Invisible larger hit pads for small muscles (biceps, forearms, calves) — reuse same paths with thicker invisible stroke via CSS
   return (
-    <figure className="body-view">
+    <figure className={`body-view ${interactive ? 'interactive' : ''}`}>
       <svg viewBox="0 0 200 440" role="img" aria-label={`${label} view of body`}>
         <g className="sil">
           <ellipse cx="100" cy="31" rx="16" ry="20" />
@@ -76,11 +100,11 @@ function View({ regions, primary, secondary, back, label }: { regions: Region[];
   );
 }
 
-export default function BodyMap({ primary, secondary }: BodyMapProps) {
+export default function BodyMap({ primary, secondary, active, onMuscle, interactive }: BodyMapProps) {
   return (
     <div className="body-map">
-      <View regions={FRONT} primary={primary} secondary={secondary} label="Front" />
-      <View regions={BACK} primary={primary} secondary={secondary} back label="Back" />
+      <View regions={FRONT} primary={primary} secondary={secondary} label="Front" active={active} onMuscle={onMuscle} interactive={interactive} />
+      <View regions={BACK} primary={primary} secondary={secondary} back label="Back" active={active} onMuscle={onMuscle} interactive={interactive} />
     </div>
   );
 }

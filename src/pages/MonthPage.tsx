@@ -1,7 +1,8 @@
+import { exName, levelLabel, partLabelI18n, useI18n } from '../i18n';
 import { useMemo, useState } from 'react';
 import { BarList, LineChart, MonthCalendar, type Series } from '../components/Charts';
 import { Segmented, Stat } from '../components/ui';
-import { BODY_PARTS, KEY_LIFTS, partLabel, type BodyPart } from '../data/exercises';
+import { BODY_PARTS, KEY_LIFTS, type BodyPart } from '../data/exercises';
 import { bestByExercise, entryStats, exMap, fmt, fmtInt, LEVEL_COLORS, LEVELS, strengthResults } from '../lib/calc';
 import { addDays, addMonths, daysInMonth, monthLabel, monthOf, monthShort, todayKey, weekKey, weeksInMonth } from '../lib/date';
 import { useData, type AppData } from '../lib/store';
@@ -45,6 +46,7 @@ function likeLifting(kg: number) {
 
 export default function MonthPage({ openDay }: { openDay: (d: string) => void }) {
   const data = useData();
+  const { t, locale, d } = useI18n();
   const [month, setMonth] = useState(monthOf(todayKey()));
   const [barMode, setBarMode] = useState<'sets' | 'volume'>('sets');
   const [range, setRange] = useState<'month' | '3m' | 'all'>('3m');
@@ -94,7 +96,7 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
   const series: Series[] = sel.map((id, i) => {
     const best = new Map<string, number>();
     for (const e of data.entries) if (e.exId === id && e.date >= chartFrom && e.date <= chartTo) { const v = entryStats(e).best; if (v > (best.get(e.date) ?? 0)) best.set(e.date, v); }
-    return { name: m.get(id)?.name ?? id, color: COLORS[i % COLORS.length], points: [...best.entries()].map(([x, y]) => ({ x, y })) };
+    return { name: exName(m.get(id), locale) || id, color: COLORS[i % COLORS.length], points: [...best.entries()].map(([x, y]) => ({ x, y })) };
   });
   const toggle = (id: string) => setPicked((p) => { const s = p ?? sel; return s.includes(id) ? s.filter((x) => x !== id) : [...s, id].slice(-5); });
 
@@ -103,41 +105,47 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
   const topPart = [...cur.parts.entries()].sort((a, b) => b[1].sets - a[1].sets)[0];
 
   const msgs: string[] = [];
-  if (nDays === 0) msgs.push('No workouts this month yet. Every big trip starts with one step. You can do it! 🚀');
+  if (nDays === 0) msgs.push(t('monthMsg.none'));
   else {
-    msgs.push(`You trained ${nDays} ${nDays === 1 ? 'day' : 'days'} this month.` + (pDays === 0 ? ' Great start! 🎉' : diff > 0 ? ` That's ${diff} more than last month! 🔥` : diff === 0 ? ' Same as last month. Nice and steady! 👍' : ` Last month was ${pDays}. Keep going! 💪`));
-    if (cur.volume > 0) msgs.push(`You lifted ${fmtInt(cur.volume)} kg in total. ${likeLifting(cur.volume)}`);
-    [...prs.out].sort((x, y) => Number(KEY_LIFTS.includes(y.exId)) - Number(KEY_LIFTS.includes(x.exId))).slice(0, 3).forEach((p) => { const ex = m.get(p.exId); msgs.push(`New PR: ${ex?.name} ${fmt(p.value)} ${ex?.bw ? 'reps' : 'kg'}! 🏆`); });
-    if (prs.out.length > 3) msgs.push(`You set ${prs.out.length} new PRs this month. Amazing work! 🥳`);
-    if (ups.length > 0 && ups.length <= 2) ups.forEach((u) => msgs.push(`Level up! Your ${u.ex.name} is now ${u.name}. ⭐`));
-    if (ups.length > 2) msgs.push(`Level up! ${ups.length} lifts reached a new level: ${ups.map((u) => `${u.ex.name} (${u.name})`).join(', ')}. ⭐`);
-    if (streak >= 3) msgs.push(`Your best streak was ${streak} days in a row. 📅`);
-    if (topPart) msgs.push(`Your top body part was ${partLabel(topPart[0])} with ${topPart[1].sets} sets.`);
-    if (prev.volume > 0 && cur.volume > prev.volume) msgs.push(`Your total volume went up ${Math.round(((cur.volume - prev.volume) / prev.volume) * 100)}% from last month. 📈`);
+    const dayWord = nDays === 1 ? t('monthMsg.day') : t('monthMsg.days');
+    let extra = pDays === 0 ? t('monthMsg.greatStart') : diff > 0 ? t('monthMsg.moreThan', { diff }) : diff === 0 ? t('monthMsg.same') : t('monthMsg.lastWas', { p: pDays });
+    msgs.push(t('monthMsg.trained', { n: nDays, dayWord }) + extra);
+    if (cur.volume > 0) msgs.push(t('monthMsg.lifted', { kg: fmtInt(cur.volume), like: likeLifting(cur.volume) }));
+    [...prs.out].sort((x, y) => Number(KEY_LIFTS.includes(y.exId)) - Number(KEY_LIFTS.includes(x.exId))).slice(0, 3).forEach((p) => {
+      const ex = m.get(p.exId);
+      const value = ex && (ex.tracking === 'duration' || ex.bw) ? (ex.tracking === 'duration' ? `${fmt(p.value, 0)}s` : `${fmt(p.value, 0)} reps`) : `${fmt(p.value)} kg`;
+      msgs.push(t('monthMsg.newPr', { name: exName(ex, locale), value }));
+    });
+    if (prs.out.length > 3) msgs.push(t('monthMsg.manyPrs', { n: prs.out.length }));
+    if (ups.length > 0 && ups.length <= 2) ups.forEach((u) => msgs.push(t('monthMsg.levelUp', { name: exName(u.ex, locale), level: levelLabel(u.name, d) })));
+    if (ups.length > 2) msgs.push(t('monthMsg.manyLevels', { n: ups.length, list: ups.map((u) => `${exName(u.ex, locale)} (${levelLabel(u.name, d)})`).join(', ') }));
+    if (streak >= 3) msgs.push(t('monthMsg.streak', { n: streak }));
+    if (topPart) msgs.push(t('monthMsg.topPart', { part: partLabelI18n(topPart[0], locale, d), sets: topPart[1].sets }));
+    if (prev.volume > 0 && cur.volume > prev.volume) msgs.push(t('monthMsg.volumeUp', { pct: Math.round(((cur.volume - prev.volume) / prev.volume) * 100) }));
   }
 
   const monthWeeks = weeksInMonth(month);
   const trainedWeekKeys = new Set([...cur.days.keys()].map(weekKey));
   const everyWeek = monthWeeks.length > 0 && monthWeeks.every((w) => trainedWeekKeys.has(w));
   const badges = [
-    { icon: '👟', name: 'First step', desc: '1+ workout', ok: nDays >= 1 },
-    { icon: '📆', name: 'Regular', desc: '8+ days', ok: nDays >= 8 },
-    { icon: '🔥', name: 'On fire', desc: '12+ days', ok: nDays >= 12 },
-    { icon: '🏆', name: 'PR hunter', desc: '1+ new PR', ok: prs.out.length >= 1 },
-    { icon: '💎', name: 'PR machine', desc: '5+ new PRs', ok: prs.out.length >= 5 },
-    { icon: '🐘', name: 'Heavy lifter', desc: '50,000 kg', ok: cur.volume >= 50000 },
-    { icon: '🧍', name: 'Full body', desc: '8+ body parts', ok: cur.parts.size >= 8 },
-    { icon: '⭐', name: 'Level up', desc: 'New strength level', ok: ups.length > 0 },
-    { icon: '🗓️', name: 'Every week', desc: 'Train each week', ok: everyWeek },
+    { icon: '👟', name: t('badges.first'), desc: t('badges.firstDesc'), ok: nDays >= 1 },
+    { icon: '📆', name: t('badges.regular'), desc: t('badges.regularDesc'), ok: nDays >= 8 },
+    { icon: '🔥', name: t('badges.fire'), desc: t('badges.fireDesc'), ok: nDays >= 12 },
+    { icon: '🏆', name: t('badges.prHunter'), desc: t('badges.prHunterDesc'), ok: prs.out.length >= 1 },
+    { icon: '💎', name: t('badges.prMachine'), desc: t('badges.prMachineDesc'), ok: prs.out.length >= 5 },
+    { icon: '🐘', name: t('badges.heavy'), desc: t('badges.heavyDesc'), ok: cur.volume >= 50000 },
+    { icon: '🧍', name: t('badges.full'), desc: t('badges.fullDesc'), ok: cur.parts.size >= 8 },
+    { icon: '⭐', name: t('badges.levelUp'), desc: t('badges.levelUpDesc'), ok: ups.length > 0 },
+    { icon: '🗓️', name: t('badges.everyWeek'), desc: t('badges.everyWeekDesc'), ok: everyWeek },
   ];
   const earned = badges.filter((b) => b.ok).length;
 
-  const partItems = BODY_PARTS.filter((p) => cur.parts.has(p)).map((p) => ({ label: partLabel(p), value: barMode === 'sets' ? cur.parts.get(p)!.sets : cur.parts.get(p)!.volume, sub: barMode === 'sets' ? `${fmtInt(cur.parts.get(p)!.volume)} kg` : `${cur.parts.get(p)!.sets} sets`, color: PART_COLORS[p] }))
+  const partItems = BODY_PARTS.filter((p) => cur.parts.has(p)).map((p) => ({ label: partLabelI18n(p, locale, d), value: barMode === 'sets' ? cur.parts.get(p)!.sets : cur.parts.get(p)!.volume, sub: barMode === 'sets' ? `${fmtInt(cur.parts.get(p)!.volume)} kg` : `${cur.parts.get(p)!.sets} sets`, color: PART_COLORS[p] }))
     .sort((a, b) => b.value - a.value);
 
   return (
     <div className="page">
-      <header className="page-head"><h1>Month</h1></header>
+      <header className="page-head"><h1>{t('month.title')}</h1></header>
       <div className="datebar">
         <button className="icon-btn" aria-label="Previous month" onClick={() => { setMonth(addMonths(month, -1)); setPicked(null); }}>‹</button>
         <div className="datebar-mid static"><span className="datebar-label">{monthLabel(month)}</span></div>
@@ -147,15 +155,15 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
       <section className={`card hero ${prs.out.length ? 'party' : ''}`}>
         {prs.out.length > 0 && <Confetti />}
         <div className="hero-num">{nDays}</div>
-        <div className="hero-text"><b>workout {nDays === 1 ? 'day' : 'days'}</b><span className="muted">{pDays ? `${monthShort(addMonths(month, -1))}: ${pDays} days` : 'in ' + monthShort(month)}</span></div>
+        <div className="hero-text"><b>{nDays === 1 ? t('month.workoutDay') : t('month.workoutDays')}</b><span className="muted">{pDays ? `${monthShort(addMonths(month, -1))}: ${pDays} days` : 'in ' + monthShort(month)}</span></div>
         <div className="hero-badges">{earned} / {badges.length} badges</div>
       </section>
 
       <div className="stats4">
-        <Stat label="Days" value={String(nDays)} delta={pDays ? diff : null} />
-        <Stat label="Sets" value={fmtInt(cur.sets)} delta={prev.sets ? cur.sets - prev.sets : null} />
-        <Stat label="Reps" value={fmtInt(cur.reps)} delta={prev.reps ? cur.reps - prev.reps : null} />
-        <Stat label="Volume" value={cur.volume >= 10000 ? fmt(cur.volume / 1000, 1) + 'k' : fmtInt(cur.volume)} unit="kg" />
+        <Stat label={t('month.days')} value={String(nDays)} delta={pDays ? diff : null} />
+        <Stat label={t('month.sets')} value={fmtInt(cur.sets)} delta={prev.sets ? cur.sets - prev.sets : null} />
+        <Stat label={t('month.reps')} value={fmtInt(cur.reps)} delta={prev.reps ? cur.reps - prev.reps : null} />
+        <Stat label={t('month.volume')} value={cur.volume >= 10000 ? fmt(cur.volume / 1000, 1) + 'k' : fmtInt(cur.volume)} unit="kg" />
       </div>
 
       <section className="card msgs">
@@ -163,7 +171,7 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
       </section>
 
       <section className="card">
-        <h2 className="card-title">Badges</h2>
+        <h2 className="card-title">{t('month.badges')}</h2>
         <div className="badges">
           {badges.map((b) => (
             <div key={b.name} className={`badge-tile ${b.ok ? 'ok' : ''}`} title={b.desc}>
@@ -176,22 +184,22 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
       </section>
 
       <section className="card">
-        <h2 className="card-title">Training days</h2>
+        <h2 className="card-title">{t('month.trainingDays')}</h2>
         <MonthCalendar month={month} values={cur.days} onPick={openDay} />
         <div className="legend"><span className="muted small">Less</span><i className="sq l1" /><i className="sq l2" /><i className="sq l3" /><i className="sq l4" /><span className="muted small">More sets</span></div>
       </section>
 
       <section className="card">
         <div className="card-title-row">
-          <h2 className="card-title">Body parts</h2>
+          <h2 className="card-title">{t('month.bodyParts')}</h2>
           <Segmented value={barMode} onChange={setBarMode} options={[{ v: 'sets', label: 'Sets' }, { v: 'volume', label: 'Volume' }]} />
         </div>
-        {partItems.length ? <BarList items={partItems} unit={barMode === 'sets' ? 'sets' : 'kg'} /> : <p className="muted">No data this month.</p>}
+        {partItems.length ? <BarList items={partItems} unit={barMode === 'sets' ? 'sets' : 'kg'} /> : <p className="muted">{t('month.noData')}</p>}
       </section>
 
       <section className="card">
         <div className="card-title-row">
-          <h2 className="card-title">Est. 1RM progress</h2>
+          <h2 className="card-title">{t('month.progress')}</h2>
           <Segmented value={range} onChange={setRange} options={[{ v: 'month', label: '1M' }, { v: '3m', label: '3M' }, { v: 'all', label: 'All' }]} />
         </div>
         {chartable.length ? (
@@ -199,7 +207,7 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
             <div className="chips scroll">
               {chartable.slice(0, 14).map((id) => {
                 const i = sel.indexOf(id);
-                return <button key={id} className={`chip toggle ${i >= 0 ? 'on' : ''}`} style={i >= 0 ? { borderColor: COLORS[i % 5], color: COLORS[i % 5] } : undefined} onClick={() => toggle(id)}>{m.get(id)?.name}</button>;
+                return <button key={id} className={`chip toggle ${i >= 0 ? 'on' : ''}`} style={i >= 0 ? { borderColor: COLORS[i % 5], color: COLORS[i % 5] } : undefined} onClick={() => toggle(id)}>{exName(m.get(id), locale)}</button>;
               })}
             </div>
             <LineChart series={series} unit="kg" from={chartFrom} to={chartTo} />
@@ -209,13 +217,13 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
       </section>
 
       <section className="card">
-        <h2 className="card-title">New PRs this month {prs.out.length > 0 && <span className="pill gold">{prs.out.length}</span>}</h2>
+        <h2 className="card-title">{t('month.newPrs')} {prs.out.length > 0 && <span className="pill gold">{prs.out.length}</span>}</h2>
         {prs.out.length ? (
           <div className="pr-list">
             {(allPrs ? prs.out : prs.out.slice(0, 5)).map((p) => { const ex = m.get(p.exId); const u = ex?.bw ? 'reps' : 'kg'; return (
               <div className="pr-item" key={p.exId}>
                 <span className="pr-medal">🏅</span>
-                <span className="grow"><b>{ex?.name}</b><small className="muted"> {fmt(p.prev)} → </small><b className="accent">{fmt(p.value)} {u}</b></span>
+                <span className="grow"><b>{exName(ex, locale)}</b><small className="muted"> {fmt(p.prev)} → </small><b className="accent">{fmt(p.value)} {u}</b></span>
                 <span className="pill up">+{fmt(p.value - p.prev)}</span>
               </div>); })}
             {prs.out.length > 5 && <button className="btn ghost small" onClick={() => setAllPrs(!allPrs)}>{allPrs ? 'Show less' : `Show all ${prs.out.length} PRs`}</button>}
@@ -226,12 +234,12 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
       </section>
 
       <section className="card">
-        <h2 className="card-title">Strength levels</h2>
+        <h2 className="card-title">{t('month.levels')}</h2>
         {!levels ? <p className="muted">Add your body weight in Profile to see levels.</p> : levels.length === 0 ? <p className="muted">Log key lifts (bench, squat, deadlift…) to see levels.</p> : (
           <div className="lvl-list">
             {(allLvls ? levels : levels.filter((l) => (l.from !== null && l.to > l.from) || KEY_LIFTS.includes(l.ex.id))).map((l) => (
               <div className="lvl-change" key={l.ex.id}>
-                <span className="grow">{l.ex.name}</span>
+                <span className="grow">{exName(l.ex, locale)}</span>
                 {l.from !== null && l.from !== l.to && <><LevelTag level={l.from} /><span className="arrow">→</span></>}
                 <LevelTag level={l.to} />
                 {l.from !== null && l.to > l.from && <span className="up-star">⬆</span>}
@@ -249,7 +257,8 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
 }
 
 export function LevelTag({ level }: { level: number }) {
-  return <span className="lvl-tag" style={{ background: level < 0 ? 'var(--line)' : LEVEL_COLORS[level] }}>{level < 0 ? 'Starter' : LEVELS[level]}</span>;
+  const { d } = useI18n();
+  return <span className="lvl-tag" style={{ background: level < 0 ? 'var(--line)' : LEVEL_COLORS[level] }}>{level < 0 ? levelLabel('Starter', d) : levelLabel(LEVELS[level], d)}</span>;
 }
 
 function Confetti() {

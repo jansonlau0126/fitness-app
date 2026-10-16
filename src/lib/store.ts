@@ -1,12 +1,13 @@
 import { useSyncExternalStore } from 'react';
-import type { Exercise } from '../data/exercises';
+import type { Exercise, Tracking } from '../data/exercises';
 import { toast } from '../components/ui';
 
-export interface SetEntry { w: number; r: number }
+export interface SetEntry { w: number; r: number; sec?: number }
 export interface LogEntry { id: string; date: string; exId: string; sets: SetEntry[]; t: number }
 export interface Profile { name: string; sex: 'male' | 'female'; age: number | null; heightCm: number | null; weightKg: number | null }
 export interface WeightLog { date: string; kg: number }
 export type Theme = 'auto' | 'dark' | 'light';
+export type Locale = 'en' | 'zh-TW';
 export interface AppData {
   app: 'janson-fit';
   version: 1;
@@ -14,14 +15,24 @@ export interface AppData {
   weights: WeightLog[];
   entries: LogEntry[];
   custom: Exercise[];
-  settings: { theme: Theme };
+  settings: { theme: Theme; locale: Locale };
 }
 
 const KEY = 'janson-fit-v1';
+
+function detectLocale(): Locale {
+  try {
+    const lang = (navigator.language || '').toLowerCase();
+    if (lang.startsWith('zh')) return 'zh-TW';
+  } catch { /* SSR / tests */ }
+  return 'en';
+}
+
 export const emptyData = (): AppData => ({
   app: 'janson-fit', version: 1,
   profile: { name: '', sex: 'male', age: null, heightCm: null, weightKg: null },
-  weights: [], entries: [], custom: [], settings: { theme: 'auto' },
+  weights: [], entries: [], custom: [],
+  settings: { theme: 'auto', locale: detectLocale() },
 });
 
 function load(): AppData {
@@ -34,11 +45,39 @@ function load(): AppData {
   }
 }
 
+function normalizeSet(s: Partial<SetEntry>): SetEntry {
+  const sec = s.sec !== undefined && s.sec !== null ? Number(s.sec) : undefined;
+  return {
+    w: Number(s.w) || 0,
+    r: Number(s.r) || 0,
+    ...(sec !== undefined && !Number.isNaN(sec) ? { sec } : {}),
+  };
+}
+
+function normalizeCustom(c: Partial<Exercise> & { id: string; name: string }): Exercise {
+  const tracking: Tracking = c.tracking ?? (c.bw ? 'reps' : 'weight_reps');
+  return {
+    id: c.id,
+    name: c.name,
+    part: (c.part as Exercise['part']) || 'Chest',
+    primary: Array.isArray(c.primary) ? c.primary : [],
+    secondary: Array.isArray(c.secondary) ? c.secondary : [],
+    equipment: (c.equipment as Exercise['equipment']) || 'dumbbell',
+    how: Array.isArray(c.how) ? c.how : [],
+    bw: tracking === 'reps',
+    tracking,
+    custom: true,
+    std: c.std,
+  };
+}
+
 export function normalize(x: unknown): AppData {
   const e = emptyData();
   if (!x || typeof x !== 'object') throw new Error('Not a valid backup file.');
   const o = x as Partial<AppData>;
   if (!Array.isArray(o.entries)) throw new Error('Not a valid backup file (no workouts found).');
+  const settings = { ...e.settings, ...(o.settings ?? {}) };
+  if (settings.locale !== 'en' && settings.locale !== 'zh-TW') settings.locale = e.settings.locale;
   const weights = Array.isArray(o.weights)
     ? o.weights
       .filter((w) => w && typeof w.kg === 'number' && typeof w.date === 'string')
@@ -50,10 +89,15 @@ export function normalize(x: unknown): AppData {
     weights,
     entries: o.entries
       .filter((en) => en && typeof en.date === 'string' && typeof en.exId === 'string' && Array.isArray(en.sets))
-      .map((en) => ({ id: String(en.id ?? uid()), date: en.date, exId: en.exId, t: Number(en.t) || Date.now(),
-        sets: en.sets.map((s) => ({ w: Number(s.w) || 0, r: Number(s.r) || 0 })) })),
-    custom: Array.isArray(o.custom) ? o.custom.map((c) => ({ ...c, custom: true })) : [],
-    settings: { ...e.settings, ...(o.settings ?? {}) },
+      .map((en) => ({
+        id: String(en.id ?? uid()),
+        date: en.date,
+        exId: en.exId,
+        t: Number(en.t) || Date.now(),
+        sets: en.sets.map((s) => normalizeSet(s)),
+      })),
+    custom: Array.isArray(o.custom) ? o.custom.filter((c) => c && c.id && c.name).map((c) => normalizeCustom(c)) : [],
+    settings,
   };
 }
 
@@ -123,9 +167,10 @@ export const actions = {
       return { ...d, weights, profile: syncWeightFromHistory(weights, d.profile) };
     });
   },
-  addCustom(ex: Exercise) { setData((d) => ({ ...d, custom: [...d.custom, { ...ex, custom: true }] })); },
+  addCustom(ex: Exercise) { setData((d) => ({ ...d, custom: [...d.custom, { ...ex, custom: true, tracking: ex.tracking ?? 'weight_reps' }] })); },
   deleteCustom(id: string) { setData((d) => ({ ...d, custom: d.custom.filter((c) => c.id !== id), entries: d.entries.filter((e) => e.exId !== id) })); },
   setTheme(theme: Theme) { setData((d) => ({ ...d, settings: { ...d.settings, theme } })); },
+  setLocale(locale: Locale) { setData((d) => ({ ...d, settings: { ...d.settings, locale } })); },
   replaceAll(d: AppData) { setData(() => d); },
   clearAll() { setData((d) => ({ ...emptyData(), settings: d.settings })); },
 };
