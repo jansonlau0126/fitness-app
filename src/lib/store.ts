@@ -16,6 +16,7 @@ export interface AppData {
   entries: LogEntry[];
   custom: Exercise[];
   settings: { theme: Theme; locale: Locale };
+  updatedAt?: number;
 }
 
 const KEY = 'janson-fit-v1';
@@ -33,6 +34,7 @@ export const emptyData = (): AppData => ({
   profile: { name: '', sex: 'male', age: null, heightCm: null, weightKg: null },
   weights: [], entries: [], custom: [],
   settings: { theme: 'auto', locale: detectLocale() },
+  updatedAt: Date.now(),
 });
 
 function load(): AppData {
@@ -98,6 +100,7 @@ export function normalize(x: unknown): AppData {
       })),
     custom: Array.isArray(o.custom) ? o.custom.filter((c) => c && c.id && c.name).map((c) => normalizeCustom(c)) : [],
     settings,
+    updatedAt: typeof o.updatedAt === 'number' ? o.updatedAt : Date.now(),
   };
 }
 
@@ -116,7 +119,7 @@ function emit() {
 }
 export function setData(fn: (d: AppData) => AppData) {
   const prev = state;
-  state = fn(state);
+  state = { ...fn(state), updatedAt: Date.now() };
   if (!emit()) {
     state = prev;
     notify();

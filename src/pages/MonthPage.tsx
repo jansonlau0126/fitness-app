@@ -1,8 +1,9 @@
 import { exName, levelLabel, partLabelI18n, useI18n } from '../i18n';
 import { useMemo, useState } from 'react';
+import { buildMonthShare, renderShareCard, shareOrDownload } from '../lib/shareCard';
 import { BarList, LineChart, MonthCalendar, type Series } from '../components/Charts';
-import { Segmented, Stat } from '../components/ui';
-import { BODY_PARTS, KEY_LIFTS, type BodyPart } from '../data/exercises';
+import { Segmented, Stat, toast } from '../components/ui';
+import { BODY_PARTS, KEY_LIFTS, type BodyPart, type Muscle } from '../data/exercises';
 import { bestByExercise, entryStats, exMap, fmt, fmtInt, LEVEL_COLORS, LEVELS, strengthResults } from '../lib/calc';
 import { addDays, addMonths, daysInMonth, monthLabel, monthOf, monthShort, todayKey, weekKey, weeksInMonth } from '../lib/date';
 import { useData, type AppData } from '../lib/store';
@@ -48,6 +49,7 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
   const data = useData();
   const { t, locale, d } = useI18n();
   const [month, setMonth] = useState(monthOf(todayKey()));
+  const [sharing, setSharing] = useState(false);
   const [barMode, setBarMode] = useState<'sets' | 'volume'>('sets');
   const [range, setRange] = useState<'month' | '3m' | 'all'>('3m');
   const [picked, setPicked] = useState<string[] | null>(null);
@@ -143,15 +145,64 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
   const partItems = BODY_PARTS.filter((p) => cur.parts.has(p)).map((p) => ({ label: partLabelI18n(p, locale, d), value: barMode === 'sets' ? cur.parts.get(p)!.sets : cur.parts.get(p)!.volume, sub: barMode === 'sets' ? `${fmtInt(cur.parts.get(p)!.volume)} kg` : `${cur.parts.get(p)!.sets} sets`, color: PART_COLORS[p] }))
     .sort((a, b) => b.value - a.value);
 
+
+  const doShare = async () => {
+    setSharing(true);
+    try {
+      const primary = new Set<Muscle>();
+      const secondary = new Set<Muscle>();
+      for (const e of cur.es) {
+        const ex = m.get(e.exId);
+        if (!ex) continue;
+        ex.primary.forEach((x) => primary.add(x));
+        ex.secondary.forEach((x) => secondary.add(x));
+      }
+      primary.forEach((p) => secondary.delete(p));
+      const lines = prs.out.slice(0, 8).map((p) => {
+        const ex = m.get(p.exId);
+        return { name: exName(ex, locale) || p.exId, detail: `${fmt(p.value)}`, pr: true };
+      });
+      if (!lines.length) {
+        for (const [id, v] of [...bestByExercise(data, mStart, mEnd).entries()].slice(0, 8)) {
+          lines.push({ name: exName(m.get(id), locale) || id, detail: `${fmt(v.value)}`, pr: false });
+        }
+      }
+      const payload = buildMonthShare({
+        title: t('share.title'),
+        subtitle: t('brand.slogan'),
+        dateLabel: monthLabel(month),
+        days: nDays,
+        sets: cur.sets,
+        volume: cur.volume,
+        lines,
+        primary: [...primary],
+        secondary: [...secondary],
+        footer: 'jansonlau0126.github.io/fitness-app · Gym Everyday',
+        locale,
+      });
+      const blob = await renderShareCard(payload);
+      const mode = await shareOrDownload(blob, `gym-everyday-${month}.png`, t('month.share'));
+      toast(mode === 'shared' ? '✓' : t('day.download'));
+    } catch {
+      toast(t('day.shareFail'));
+    } finally { setSharing(false); }
+  };
+
   return (
     <div className="page">
-      <header className="page-head"><h1>{t('month.title')}</h1></header>
+      <header className="page-head"><h1>{t('month.title')}</h1><button className="btn small ghost" disabled={sharing || nDays === 0} onClick={doShare}>{t('month.share')}</button></header>
       <div className="datebar">
         <button className="icon-btn" aria-label="Previous month" onClick={() => { setMonth(addMonths(month, -1)); setPicked(null); }}>‹</button>
         <div className="datebar-mid static"><span className="datebar-label">{monthLabel(month)}</span></div>
         <button className="icon-btn" aria-label="Next month" onClick={() => { setMonth(addMonths(month, 1)); setPicked(null); }}>›</button>
       </div>
 
+      {streak >= 2 && (
+        <div className="streak-banner">
+          <div className="n">{streak}</div>
+          <div><b>{locale === 'zh-TW' ? '最長連續' : 'Best streak'}</b><div className="small muted">{locale === 'zh-TW' ? '本月連續訓練天數' : 'days in a row this month'}</div></div>
+        </div>
+      )}
       <section className={`card hero ${prs.out.length ? 'party' : ''}`}>
         {prs.out.length > 0 && <Confetti />}
         <div className="hero-num">{nDays}</div>

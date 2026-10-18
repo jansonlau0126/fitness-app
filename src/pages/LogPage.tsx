@@ -22,7 +22,10 @@ export default function LogPage({ date, setDate, goSummary }: { date: string; se
   return (
     <div className="page">
       <header className="page-head">
-        <h1>{t('log.title')}</h1>
+        <div>
+          <h1>{t('log.title')}</h1>
+          <div className="brand-slogan"><em>{t('brand.slogan')}</em></div>
+        </div>
         {entries.length > 0 && <span className="pill">{entries.length} {t('log.exercises')} · {totals.sets} {t('log.sets')}</span>}
       </header>
       <DateBar date={date} setDate={setDate} />

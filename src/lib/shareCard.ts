@@ -12,87 +12,148 @@ export interface ShareLine {
 export interface SharePayload {
   title: string;
   dateLabel: string;
+  subtitle?: string;
   primary: Muscle[];
   secondary: Muscle[];
   lines: ShareLine[];
-  stats: { sets: number; volume: number; exercises: number; totalSec?: number };
+  stats: { sets: number; volume: number; exercises: number; days?: number };
   footer: string;
   locale: Locale;
 }
 
-/** Draw a dark vertical share card to a PNG blob. */
+const W = 1080;
+const PAD = 56;
+
+/** High-res vertical share card (1080×~1920+). */
 export async function renderShareCard(p: SharePayload): Promise<Blob> {
-  const W = 720, pad = 36;
-  const rowH = 52;
-  const headerH = 120;
-  const bodyH = 280;
-  const statsH = 90;
-  const listH = Math.max(p.lines.length, 1) * rowH + 40;
-  const H = headerH + bodyH + statsH + listH + 100;
+  const rowH = 88;
+  const headerH = 200;
+  const bodyH = 520;
+  const statsH = 160;
+  const listH = Math.max(p.lines.length, 1) * rowH + 80;
+  const H = Math.max(1920, headerH + bodyH + statsH + listH + 140);
   const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
+  canvas.width = W;
+  canvas.height = H;
   const ctx = canvas.getContext('2d')!;
 
-  // bg
-  ctx.fillStyle = '#0f1115';
+  // night sky bg
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#1a1030');
+  bg.addColorStop(0.25, '#0a0614');
+  bg.addColorStop(1, '#05040a');
+  ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
+
+  // dawn glow
+  const glow = ctx.createRadialGradient(W / 2, 0, 20, W / 2, 80, 520);
+  glow.addColorStop(0, 'rgba(255,140,70,0.35)');
+  glow.addColorStop(0.5, 'rgba(120,60,200,0.12)');
+  glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, 600);
+
   // accent bar
   const grad = ctx.createLinearGradient(0, 0, W, 0);
-  grad.addColorStop(0, '#ff8f66'); grad.addColorStop(1, '#ff6b3d');
-  ctx.fillStyle = grad; ctx.fillRect(0, 0, W, 6);
+  grad.addColorStop(0, '#ffb06a');
+  grad.addColorStop(1, '#ff6a2a');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, 10);
 
-  ctx.fillStyle = '#eef1f6';
-  ctx.font = '800 42px system-ui,sans-serif';
-  ctx.fillText(p.title, pad, 56);
-  ctx.fillStyle = '#9aa3b2';
-  ctx.font = '600 24px system-ui,sans-serif';
-  ctx.fillText(p.dateLabel, pad, 92);
+  ctx.fillStyle = '#f3eef8';
+  ctx.font = '850 64px system-ui,sans-serif';
+  ctx.fillText(p.title, PAD, 90);
+  ctx.fillStyle = '#ffb06a';
+  ctx.font = '650 28px system-ui,sans-serif';
+  ctx.fillText(p.subtitle || 'Gym everyday, gym today.', PAD, 132);
+  ctx.fillStyle = '#a89bb8';
+  ctx.font = '600 32px system-ui,sans-serif';
+  ctx.fillText(p.dateLabel, PAD, 178);
 
-  // Mini body diagram (simple colored circles legend + silhouette boxes)
-  const bodyY = headerH + 10;
-  drawMiniBody(ctx, pad + 40, bodyY, p.primary, p.secondary, false);
+  const bodyY = headerH + 20;
+  drawMiniBody(ctx, PAD + 40, bodyY, p.primary, p.secondary, false);
   drawMiniBody(ctx, W / 2 + 40, bodyY, p.primary, p.secondary, true);
-  ctx.fillStyle = '#9aa3b2'; ctx.font = '700 16px system-ui';
-  ctx.fillText('Front', pad + 90, bodyY + 250);
-  ctx.fillText('Back', W / 2 + 100, bodyY + 250);
+  ctx.fillStyle = '#a89bb8';
+  ctx.font = '700 26px system-ui';
+  ctx.fillText('Front', PAD + 160, bodyY + 460);
+  ctx.fillText('Back', W / 2 + 170, bodyY + 460);
 
-  // Stats
   const sy = headerH + bodyH;
-  const cards = [
+  const cards: { l: string; v: string }[] = [
     { l: p.locale === 'zh-TW' ? '動作' : 'Exercises', v: String(p.stats.exercises) },
     { l: p.locale === 'zh-TW' ? '組' : 'Sets', v: String(p.stats.sets) },
-    { l: p.locale === 'zh-TW' ? '總量' : 'Volume', v: p.stats.volume >= 10000 ? fmt(p.stats.volume / 1000, 1) + 'k' : fmtInt(p.stats.volume) },
+    {
+      l: p.stats.days != null ? (p.locale === 'zh-TW' ? '天' : 'Days') : (p.locale === 'zh-TW' ? '總量' : 'Volume'),
+      v: p.stats.days != null
+        ? String(p.stats.days)
+        : p.stats.volume >= 10000 ? fmt(p.stats.volume / 1000, 1) + 'k' : fmtInt(p.stats.volume),
+    },
   ];
+  if (p.stats.days != null) {
+    cards[2] = { l: p.locale === 'zh-TW' ? '天' : 'Days', v: String(p.stats.days) };
+    cards.push({
+      l: p.locale === 'zh-TW' ? '總量' : 'Volume',
+      v: p.stats.volume >= 10000 ? fmt(p.stats.volume / 1000, 1) + 'k' : fmtInt(p.stats.volume),
+    });
+  }
+  const cardW = p.stats.days != null ? 220 : 300;
+  const gap = 24;
+  const totalW = cards.length * cardW + (cards.length - 1) * gap;
+  const startX = (W - totalW) / 2;
   cards.forEach((c, i) => {
-    const x = pad + i * 220;
-    ctx.fillStyle = '#181b22';
-    roundRect(ctx, x, sy, 200, 70, 16); ctx.fill();
-    ctx.fillStyle = '#eef1f6'; ctx.font = '800 32px system-ui';
-    ctx.fillText(c.v, x + 16, sy + 40);
-    ctx.fillStyle = '#9aa3b2'; ctx.font = '600 16px system-ui';
-    ctx.fillText(c.l, x + 16, sy + 60);
+    const x = startX + i * (cardW + gap);
+    ctx.fillStyle = '#14101f';
+    roundRect(ctx, x, sy, cardW, 120, 24);
+    ctx.fill();
+    ctx.strokeStyle = '#2e2640';
+    ctx.lineWidth = 2;
+    roundRect(ctx, x, sy, cardW, 120, 24);
+    ctx.stroke();
+    ctx.fillStyle = '#f3eef8';
+    ctx.font = '850 48px system-ui';
+    ctx.fillText(c.v, x + 24, sy + 62);
+    ctx.fillStyle = '#a89bb8';
+    ctx.font = '650 24px system-ui';
+    ctx.fillText(c.l, x + 24, sy + 96);
   });
 
-  // Exercise list
-  let y = sy + statsH + 10;
-  ctx.fillStyle = '#eef1f6'; ctx.font = '800 22px system-ui';
-  ctx.fillText(p.locale === 'zh-TW' ? '動作' : 'Exercises', pad, y);
-  y += 28;
-  for (const line of p.lines) {
-    ctx.fillStyle = '#1f232c';
-    roundRect(ctx, pad, y, W - pad * 2, rowH - 8, 12); ctx.fill();
-    ctx.fillStyle = '#eef1f6'; ctx.font = '700 20px system-ui';
-    ctx.fillText(line.name + (line.pr ? ' 🏆' : ''), pad + 14, y + 28);
-    ctx.fillStyle = '#ff6b3d'; ctx.font = '700 18px system-ui';
+  let y = sy + statsH + 20;
+  ctx.fillStyle = '#f3eef8';
+  ctx.font = '800 36px system-ui';
+  ctx.fillText(p.locale === 'zh-TW' ? '動作' : 'Exercises', PAD, y);
+  y += 40;
+  for (const line of p.lines.slice(0, 12)) {
+    ctx.fillStyle = '#1c1629';
+    roundRect(ctx, PAD, y, W - PAD * 2, rowH - 12, 18);
+    ctx.fill();
+    ctx.fillStyle = '#f3eef8';
+    ctx.font = '750 32px system-ui';
+    const name = line.name + (line.pr ? ' 🏆' : '');
+    ctx.fillText(truncate(ctx, name, W - PAD * 2 - 280), PAD + 28, y + 48);
+    ctx.fillStyle = '#ff7a3d';
+    ctx.font = '750 30px system-ui';
     const tw = ctx.measureText(line.detail).width;
-    ctx.fillText(line.detail, W - pad - 14 - tw, y + 28);
+    ctx.fillText(line.detail, W - PAD - 28 - tw, y + 48);
     y += rowH;
   }
+  if (p.lines.length > 12) {
+    ctx.fillStyle = '#a89bb8';
+    ctx.font = '600 26px system-ui';
+    ctx.fillText(`+${p.lines.length - 12} more`, PAD, y + 20);
+  }
 
-  ctx.fillStyle = '#667085'; ctx.font = '600 16px system-ui';
-  ctx.fillText(p.footer, pad, H - 28);
+  ctx.fillStyle = '#6b5f7a';
+  ctx.font = '600 24px system-ui';
+  ctx.fillText(p.footer, PAD, H - 48);
 
   return new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error('blob'))), 'image/png'));
+}
+
+function truncate(ctx: CanvasRenderingContext2D, text: string, max: number) {
+  if (ctx.measureText(text).width <= max) return text;
+  let t = text;
+  while (t.length > 1 && ctx.measureText(t + '…').width > max) t = t.slice(0, -1);
+  return t + '…';
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -107,76 +168,102 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 
 function drawMiniBody(ctx: CanvasRenderingContext2D, x: number, y: number, pri: Muscle[], sec: Muscle[], back: boolean) {
   const ps = new Set(pri), ss = new Set(sec);
-  // silhouette
-  ctx.fillStyle = '#232833';
-  ctx.beginPath(); ctx.ellipse(x + 60, y + 22, 14, 18, 0, 0, Math.PI * 2); ctx.fill();
-  roundRect(ctx, x + 30, y + 42, 60, 90, 18); ctx.fill(); // torso
-  roundRect(ctx, x + 8, y + 50, 22, 70, 10); ctx.fill(); // L arm
-  roundRect(ctx, x + 90, y + 50, 22, 70, 10); ctx.fill(); // R arm
-  roundRect(ctx, x + 36, y + 130, 22, 100, 10); ctx.fill(); // L leg
-  roundRect(ctx, x + 62, y + 130, 22, 100, 10); ctx.fill(); // R leg
+  const scale = 1.7;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = '#1a1428';
+  ctx.beginPath(); ctx.ellipse(60, 22, 16, 20, 0, 0, Math.PI * 2); ctx.fill();
+  roundRect(ctx, 28, 42, 64, 100, 20); ctx.fill();
+  roundRect(ctx, 4, 50, 26, 78, 12); ctx.fill();
+  roundRect(ctx, 90, 50, 26, 78, 12); ctx.fill();
+  roundRect(ctx, 34, 140, 24, 110, 12); ctx.fill();
+  roundRect(ctx, 62, 140, 24, 110, 12); ctx.fill();
 
   const paint = (mx: number, my: number, mw: number, mh: number, m: Muscle) => {
-    if (ps.has(m)) ctx.fillStyle = '#ff4f24';
-    else if (ss.has(m)) ctx.fillStyle = 'rgba(255,176,140,.85)';
+    if (ps.has(m)) ctx.fillStyle = '#ff6a2a';
+    else if (ss.has(m)) ctx.fillStyle = 'rgba(255,196,160,.9)';
     else return;
-    roundRect(ctx, mx, my, mw, mh, 8); ctx.fill();
+    roundRect(ctx, mx, my, mw, mh, 10); ctx.fill();
   };
   if (!back) {
-    paint(x + 36, y + 48, 48, 36, 'chest');
-    paint(x + 48, y + 88, 24, 40, 'abs');
-    paint(x + 10, y + 55, 18, 36, 'biceps');
-    paint(x + 92, y + 55, 18, 36, 'biceps');
-    paint(x + 38, y + 135, 18, 50, 'quads');
-    paint(x + 64, y + 135, 18, 50, 'quads');
-    paint(x + 38, y + 195, 18, 30, 'calves');
-    paint(x + 64, y + 195, 18, 30, 'calves');
-    paint(x + 34, y + 44, 16, 20, 'shoulders');
-    paint(x + 70, y + 44, 16, 20, 'shoulders');
+    paint(34, 48, 52, 40, 'chest');
+    paint(46, 92, 28, 44, 'abs');
+    paint(6, 58, 22, 40, 'biceps');
+    paint(92, 58, 22, 40, 'biceps');
+    paint(36, 148, 20, 56, 'quads');
+    paint(64, 148, 20, 56, 'quads');
+    paint(36, 214, 20, 34, 'calves');
+    paint(64, 214, 20, 34, 'calves');
+    paint(32, 44, 18, 22, 'shoulders');
+    paint(70, 44, 18, 22, 'shoulders');
   } else {
-    paint(x + 36, y + 48, 48, 50, 'lats');
-    paint(x + 48, y + 100, 24, 30, 'lower-back');
-    paint(x + 38, y + 132, 44, 36, 'glutes');
-    paint(x + 38, y + 170, 18, 40, 'hamstrings');
-    paint(x + 64, y + 170, 18, 40, 'hamstrings');
-    paint(x + 10, y + 55, 18, 36, 'triceps');
-    paint(x + 92, y + 55, 18, 36, 'triceps');
-    paint(x + 42, y + 42, 36, 20, 'traps');
+    paint(34, 48, 52, 56, 'lats');
+    paint(46, 108, 28, 34, 'lower-back');
+    paint(36, 144, 48, 40, 'glutes');
+    paint(36, 186, 20, 44, 'hamstrings');
+    paint(64, 186, 20, 44, 'hamstrings');
+    paint(6, 58, 22, 40, 'triceps');
+    paint(92, 58, 22, 40, 'triceps');
+    paint(40, 42, 40, 22, 'traps');
   }
+  ctx.restore();
 }
 
 export function buildDayShare(
   summary: DaySummary,
   exById: Map<string, Exercise>,
   prIds: Set<string>,
-  labels: { title: string; dateLabel: string; footer: string; locale: Locale; nameOf: (ex: Exercise) => string },
+  labels: { title: string; dateLabel: string; footer: string; locale: Locale; nameOf: (ex: Exercise) => string; subtitle?: string },
 ): SharePayload {
   return {
     title: labels.title,
     dateLabel: labels.dateLabel,
+    subtitle: labels.subtitle,
     primary: [...summary.primary],
     secondary: [...summary.secondary],
     lines: summary.entries.map((en) => {
       const ex = exById.get(en.exId);
-      const st = summary.entries && en;
-      // recompute lightly
       let detail = '';
       if (ex && trackingOf(ex) === 'duration') {
-        const max = Math.max(0, ...en.sets.map((s) => s.sec ?? 0));
-        detail = fmtSec(max);
+        detail = fmtSec(Math.max(0, ...en.sets.map((s) => s.sec ?? 0)));
       } else if (ex && (trackingOf(ex) === 'reps' || ex.bw)) {
-        const max = Math.max(0, ...en.sets.map((s) => s.r));
-        detail = `${max} reps`;
+        detail = `${Math.max(0, ...en.sets.map((s) => s.r))} reps`;
       } else {
         const best = Math.max(0, ...en.sets.map((s) => (s.w && s.r ? s.w * (s.r === 1 ? 1 : 1 + s.r / 30) : 0)));
         detail = `${fmt(best)} kg`;
       }
-      void st;
       return { name: ex ? labels.nameOf(ex) : en.exId, detail, pr: prIds.has(en.exId) };
     }),
-    stats: { sets: summary.sets, volume: summary.volume, exercises: summary.entries.length, totalSec: summary.totalSec },
+    stats: { sets: summary.sets, volume: summary.volume, exercises: summary.entries.length },
     footer: labels.footer,
     locale: labels.locale,
+  };
+}
+
+export function buildMonthShare(opts: {
+  title: string;
+  dateLabel: string;
+  subtitle?: string;
+  days: number;
+  sets: number;
+  volume: number;
+  lines: ShareLine[];
+  primary: Muscle[];
+  secondary: Muscle[];
+  footer: string;
+  locale: Locale;
+}): SharePayload {
+  return {
+    title: opts.title,
+    dateLabel: opts.dateLabel,
+    subtitle: opts.subtitle,
+    primary: opts.primary,
+    secondary: opts.secondary,
+    lines: opts.lines,
+    stats: { sets: opts.sets, volume: opts.volume, exercises: opts.lines.length, days: opts.days },
+    footer: opts.footer,
+    locale: opts.locale,
   };
 }
 

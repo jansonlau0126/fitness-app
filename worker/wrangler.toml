@@ -1,0 +1,14 @@
+name = "gym-everyday-api"
+main = "src/index.ts"
+compatibility_date = "2026-09-17"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "gym-everyday"
+database_id = "2e68f0bf-a958-453f-ab25-3f1f2a9135a9"
+
+[vars]
+# Set after user creates Google OAuth Web client:
+# GOOGLE_CLIENT_ID = "xxxxx.apps.googleusercontent.com"
+ALLOWED_ORIGINS = "https://jansonlau0126.github.io,http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"

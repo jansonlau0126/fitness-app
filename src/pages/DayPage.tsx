@@ -43,6 +43,14 @@ export default function DayPage({ date, setDate, goLog }: { date: string; setDat
         return ex && (ex.primary.includes(filter) || ex.secondary.includes(filter));
       })
     : s.entries;
+  const filterStats = (() => {
+    let sets = 0, reps = 0, volume = 0;
+    for (const en of visible) {
+      const st = entryStats(en);
+      sets += st.sets; reps += st.reps; volume += st.volume;
+    }
+    return { sets, reps, volume, exercises: visible.length };
+  })();
 
   const doShare = async () => {
     setSharing(true);
@@ -50,8 +58,9 @@ export default function DayPage({ date, setDate, goLog }: { date: string; setDat
       const prIds = new Set(prs.map((p) => p.exId));
       const payload = buildDayShare(s, m, prIds, {
         title: t('share.title'),
+        subtitle: t('brand.slogan'),
         dateLabel: niceDay(date) + ' · ' + date,
-        footer: 'jansonlau0126.github.io/fitness-app',
+        footer: 'jansonlau0126.github.io/fitness-app · Gym Everyday',
         locale,
         nameOf: (ex) => exName(ex, locale),
       });
@@ -115,10 +124,10 @@ export default function DayPage({ date, setDate, goLog }: { date: string; setDat
           )}
 
           <div className="stats4">
-            <Stat label={t('day.exercises')} value={String(s.entries.length)} />
-            <Stat label={t('month.sets')} value={String(s.sets)} />
-            <Stat label={t('month.reps')} value={fmtInt(s.reps)} />
-            <Stat label={t('month.volume')} value={s.volume >= 10000 ? fmt(s.volume / 1000, 1) + 'k' : fmtInt(s.volume)} unit="kg" />
+            <Stat label={t('day.exercises')} value={String(filterStats.exercises)} />
+            <Stat label={t('month.sets')} value={String(filterStats.sets)} />
+            <Stat label={t('month.reps')} value={fmtInt(filterStats.reps)} />
+            <Stat label={t('month.volume')} value={filterStats.volume >= 10000 ? fmt(filterStats.volume / 1000, 1) + 'k' : fmtInt(filterStats.volume)} unit="kg" />
           </div>
 
           <section className="card" ref={listRef}>

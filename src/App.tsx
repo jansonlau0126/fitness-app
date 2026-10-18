@@ -40,7 +40,7 @@ function AppInner() {
     const apply = () => {
       const dark = t === 'dark' || (t === 'auto' && !window.matchMedia('(prefers-color-scheme: light)').matches);
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0f1115' : '#f5f6f8');
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0a0614' : '#f6f1ea');
     };
     apply();
     const mq = window.matchMedia('(prefers-color-scheme: light)'); mq.addEventListener('change', apply);

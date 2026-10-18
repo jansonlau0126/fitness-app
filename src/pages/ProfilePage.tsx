@@ -1,4 +1,4 @@
-import { Fragment, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Sparkline } from '../components/Charts';
 import { confirmDialog, NumberField, Segmented, toast } from '../components/ui';
 import { KEY_LIFTS } from '../data/exercises';
@@ -9,6 +9,9 @@ import { PHOTO_CREDIT_URL } from '../data/images';
 import { exName, levelLabel, useI18n, useLocaleActions } from '../i18n';
 import type { Locale } from '../lib/store';
 import { actions, normalize, useData, type Theme } from '../lib/store';
+import {
+  googleConfigured, health, loadAuth, loadSyncMeta, signInWithGoogle, signOut, syncNow, type AuthUser,
+} from '../lib/sync';
 
 export default function ProfilePage() {
   const data = useData();
@@ -19,6 +22,12 @@ export default function ProfilePage() {
   const [wKg, setWKg] = useState<number | null>(null);
   const [moreLifts, setMoreLifts] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [user, setUser] = useState<AuthUser | null>(() => loadAuth());
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [apiReady, setApiReady] = useState<{ ok: boolean; googleConfigured: boolean } | null>(null);
+  const meta = loadSyncMeta();
+  useEffect(() => { health().then(setApiReady).catch(() => setApiReady({ ok: false, googleConfigured: false })); }, []);
+
   const bmi = p.heightCm && p.weightKg ? p.weightKg / (p.heightCm / 100) ** 2 : null;
   const results = strengthResults(data, KEY_LIFTS);
   const order = (id: string) => { const i = KEY_LIFTS.indexOf(id); return i < 0 ? 100 : i; };
@@ -29,13 +38,13 @@ export default function ProfilePage() {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = `fitness-backup-${todayKey()}.json`; a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    toast('Backup file saved ✓');
+    toast(t('toast.backupSaved'));
   };
   const importData = async (f: File) => {
     try {
       const d = normalize(JSON.parse(await f.text()));
-      if (await confirmDialog(`This file has ${d.entries.length} exercise logs. Replace ALL data on this phone with it?`, { title: 'Import backup', ok: 'Replace' })) { actions.replaceAll(d); toast('Backup loaded ✓'); }
-    } catch (e) { toast('❌ ' + (e instanceof Error ? e.message : 'Could not read file.')); }
+      if (await confirmDialog(t('toast.importMsg', { n: d.entries.length }), { title: t('toast.importTitle'), ok: t('toast.importOk') })) { actions.replaceAll(d); toast(t('toast.backupLoaded')); }
+    } catch (e) { toast('❌ ' + (e instanceof Error ? e.message : t('toast.backupBad'))); }
   };
 
   return (
@@ -61,7 +70,7 @@ export default function ProfilePage() {
         <div className="row gap wrap-row">
           <input type="date" value={wDate} onChange={(e) => setWDate(e.target.value)} aria-label="Weight date" className="grow" />
           <NumberField value={wKg} onChange={setWKg} placeholder="0" suffix="kg" className="w90" />
-          <button className="btn primary" disabled={!wKg} onClick={() => { if (wKg) { actions.addWeight({ date: wDate, kg: wKg }); setWKg(null); toast('Weight saved ✓'); } }}>Add</button>
+          <button className="btn primary" disabled={!wKg} onClick={() => { if (wKg) { actions.addWeight({ date: wDate, kg: wKg }); setWKg(null); toast(t('toast.weightSaved')); } }}>Add</button>
         </div>
         {data.weights.length >= 2 && <Sparkline points={data.weights.map((w) => ({ x: w.date, y: w.kg }))} />}
         {data.weights.length > 0 ? (
@@ -73,7 +82,7 @@ export default function ProfilePage() {
               </div>
             ))}
           </div>
-        ) : <p className="muted small">No weights yet. Adding one also updates your weight above.</p>}
+        ) : <p className="muted small">{t('profile.noWeights')}</p>}
       </section>
 
       <section className="card" id="standards">
@@ -101,6 +110,55 @@ export default function ProfilePage() {
         <p className="small muted note">{p.age ? t('profile.ageNote') : t('profile.noAgeNote')}</p>
       </section>
 
+
+      <section className="card sync-card" id="sync">
+        <h2 className="card-title">{t('sync.title')}</h2>
+        {!googleConfigured() || (apiReady && !apiReady.googleConfigured) ? (
+          <div className="sync-setup">
+            <b>{t('sync.setupTitle')}</b>
+            <p className="small muted">{t('sync.setupBody')}</p>
+            <p className="small muted">{t('sync.appleLater')}</p>
+          </div>
+        ) : user ? (
+          <div className="stack">
+            <div className="user-row">
+              {user.picture && <img className="avatar" src={user.picture} alt="" />}
+              <div className="grow">
+                <div className="strong">{t('sync.signedInAs')}</div>
+                <div className="small muted">{user.name || user.email}</div>
+                <div className="small muted">{t('sync.lastSynced')}: {meta.lastSyncedAt ? new Date(meta.lastSyncedAt).toLocaleString() : t('sync.never')}</div>
+              </div>
+            </div>
+            <button className="btn primary big" disabled={syncBusy} onClick={async () => {
+              setSyncBusy(true);
+              try {
+                const r = await syncNow(data, data.updatedAt ?? 0);
+                if (!r.result.ok) toast(r.result.error === 'offline' ? t('sync.offline') : t('sync.needSetup'));
+                else {
+                  if (r.data) actions.replaceAll(r.data);
+                  toast(r.result.pulled ? t('sync.conflict') : t('sync.synced'));
+                  setUser(loadAuth());
+                }
+              } finally { setSyncBusy(false); }
+            }}>{syncBusy ? t('sync.syncing') : t('sync.syncNow')}</button>
+            <button className="btn ghost" onClick={() => { signOut(); setUser(null); toast(t('sync.signOut')); }}>{t('sync.signOut')}</button>
+          </div>
+        ) : (
+          <div className="stack">
+            <button className="btn primary big" onClick={async () => {
+              try {
+                const u = await signInWithGoogle();
+                setUser(u);
+                toast(t('sync.synced'));
+                const r = await syncNow(data, data.updatedAt ?? 0);
+                if (r.data) actions.replaceAll(r.data);
+              } catch { toast(t('sync.needSetup')); }
+            }}>{t('sync.signInGoogle')}</button>
+            <p className="small muted">{t('sync.appleLater')}</p>
+          </div>
+        )}
+      </section>
+
       <section className="card">
         <h2 className="card-title">{t('profile.language')}</h2>
         <Segmented value={locale} onChange={(v: Locale) => setLocale(v)} options={[{ v: 'en', label: t('profile.english') }, { v: 'zh-TW', label: t('profile.chinese') }]} />
@@ -120,12 +178,12 @@ export default function ProfilePage() {
           <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) importData(f); e.target.value = ''; }} />
           <button className="btn ghost big" onClick={async () => {
             const has = data.entries.length > 0;
-            if (await confirmDialog(has ? 'Load demo data? This will REPLACE your data with 6 weeks of sample workouts.' : 'Load 6 weeks of sample workouts so you can try the charts?', { title: 'Load demo data', ok: 'Load demo', danger: has })) {
-              actions.replaceAll({ ...makeDemo(), settings: data.settings }); toast('Demo data loaded ✓');
+            if (await confirmDialog(has ? t('toast.demoHas') : t('toast.demoEmpty'), { title: t('toast.demoTitle'), ok: t('toast.demoOk'), danger: has })) {
+              actions.replaceAll({ ...makeDemo(), settings: data.settings }); toast(t('toast.demoLoaded'));
             }
           }}>{t('profile.demo')}</button>
           <button className="btn danger big" onClick={async () => {
-            if (await confirmDialog('Delete ALL workouts, profile and custom exercises? This cannot be undone.', { title: 'Clear all data', ok: 'Delete all', danger: true })) { actions.clearAll(); toast('All data cleared'); }
+            if (await confirmDialog(t('toast.clearMsg'), { title: t('toast.clearTitle'), ok: t('toast.clearOk'), danger: true })) { actions.clearAll(); toast(t('toast.cleared')); }
           }}>{t('profile.clear')}</button>
         </div>
       </section>
@@ -134,7 +192,7 @@ export default function ProfilePage() {
         <p className="small muted">{t('profile.ageNote')}</p>
         <p className="small muted">{t('profile.photoCredit')} <a href={PHOTO_CREDIT_URL} target="_blank" rel="noopener noreferrer">github.com/yuhonas/free-exercise-db</a>. {t('profile.iconsCredit')}</p>
       </section>
-      <p className="center-text small muted">Fitness Log · made for Janson 🇭🇰</p>
+      <p className="center-text small muted">{t('profile.madeFor')}</p>
     </div>
   );
 }
