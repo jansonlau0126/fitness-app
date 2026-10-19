@@ -62,20 +62,46 @@ export function BarList({ items, unit }: { items: { label: string; value: number
   );
 }
 
-export function MonthCalendar({ month, values, onPick }: { month: string; values: Map<string, number>; onPick?: (d: string) => void }) {
+function heatLevel(v: number, sorted: number[]): number {
+  if (v <= 0 || !sorted.length) return 0;
+  if (sorted[0] === sorted[sorted.length - 1]) return 3;
+  if (sorted.length === 1) return 4;
+  let below = 0;
+  for (const x of sorted) if (x < v) below++;
+  const rank = below / (sorted.length - 1);
+  if (rank < 0.25) return 1;
+  if (rank < 0.5) return 2;
+  if (rank < 0.75) return 3;
+  return 4;
+}
+
+function heatCompact(mode: 'sets' | 'volume', v: number) {
+  if (v <= 0) return '';
+  if (mode === 'sets') return String(v);
+  if (v >= 1000) {
+    const k = v / 1000;
+    return `${k >= 10 ? Math.round(k) : Math.round(k * 10) / 10}k`;
+  }
+  return String(Math.round(v));
+}
+
+export function MonthCalendar({ month, values, onPick, mode = 'sets' }: { month: string; values: Map<string, number>; onPick?: (d: string) => void; mode?: 'sets' | 'volume' }) {
   const n = daysInMonth(month), start = monthStartDow(month), today = todayKey();
-  const max = Math.max(1, ...values.values());
+  const sorted = [...values.values()].filter((v) => v > 0).sort((a, b) => a - b);
   const cells: (string | null)[] = [...Array(start).fill(null), ...Array.from({ length: n }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`)];
+  const unit = mode === 'volume' ? 'kg' : 'sets';
   return (
     <div className="cal">
       {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <div key={i} className="cal-dow">{d}</div>)}
       {cells.map((k, i) => {
         if (!k) return <div key={'e' + i} />;
         const v = values.get(k) ?? 0;
-        const lvl = v === 0 ? 0 : Math.min(4, Math.ceil((v / max) * 4));
+        const lvl = heatLevel(v, sorted);
+        const sub = heatCompact(mode, v);
         return (
-          <button key={k} className={`cal-day l${lvl} ${k === today ? 'today' : ''}`} onClick={() => onPick?.(k)} aria-label={`${k}: ${v} sets`}>
-            {Number(k.slice(8))}
+          <button key={k} className={`cal-day l${lvl} ${k === today ? 'today' : ''}`} onClick={() => onPick?.(k)} aria-label={`${k}: ${v} ${unit}`}>
+            <span className="cal-n">{Number(k.slice(8))}</span>
+            {sub && <span className="cal-v">{sub}</span>}
           </button>
         );
       })}

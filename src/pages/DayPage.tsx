@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import BodyMap from '../components/BodyMap';
 import { DateBar, Empty, Stat, toast } from '../components/ui';
 import { ExThumb } from '../components/Thumb';
+import { PrTimelineList } from '../components/PrTimeline';
+import { ShareStyleBar } from '../components/ShareStyleBar';
 import type { Muscle } from '../data/exercises';
 import { trackingOf } from '../data/exercises';
-import { daySummary, entryStats, exMap, fmt, fmtInt, fmtSec, formatMetric, prsOn } from '../lib/calc';
+import { daySummary, entryStats, exMap, fmt, fmtInt, fmtSec, formatMetric, prsOn, prTimeline } from '../lib/calc';
 import { buildDayShare, pngSize, renderShareCard, shareOrDownload } from '../lib/shareCard';
 import { useData } from '../lib/store';
 import { niceDay } from '../lib/date';
@@ -22,6 +24,7 @@ export default function DayPage({ date, setDate, goLog }: { date: string; setDat
   const [sharing, setSharing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewDim, setPreviewDim] = useState('');
+  const recentPrs = useMemo(() => prTimeline(data).slice(0, 5), [data]);
 
   useEffect(() => { setFilter(null); setFlash(new Set()); }, [date]);
 
@@ -54,10 +57,11 @@ export default function DayPage({ date, setDate, goLog }: { date: string; setDat
     return { sets, reps, volume, exercises: visible.length };
   })();
 
-  const doShare = async () => {
+  const doShare = async (send: boolean) => {
     setSharing(true);
     try {
       const prIds = new Set(prs.map((p) => p.exId));
+      const style = data.settings.shareStyle;
       const payload = buildDayShare(s, m, prIds, {
         title: t('share.title'),
         subtitle: t('brand.slogan'),
@@ -66,13 +70,15 @@ export default function DayPage({ date, setDate, goLog }: { date: string; setDat
         locale,
         nameOf: (ex) => exName(ex, locale),
       });
-      const blob = await renderShareCard(payload);
+      const blob = await renderShareCard(payload, style);
       const dim = await pngSize(blob);
-      setPreviewDim(`${dim.w}×${dim.h}`);
+      setPreviewDim(`${dim.w}×${dim.h} · ${style}`);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(URL.createObjectURL(blob));
-      const mode = await shareOrDownload(blob, `gym-everyday-${date}.png`, t('day.share'));
-      toast(mode === 'shared' ? '✓' : t('day.download'));
+      if (send) {
+        const mode = await shareOrDownload(blob, `gym-everyday-${date}-${style}.png`, t('day.share'));
+        toast(mode === 'shared' ? '✓' : t('day.download'));
+      }
     } catch {
       toast(t('day.shareFail'));
     } finally { setSharing(false); }
@@ -82,16 +88,30 @@ export default function DayPage({ date, setDate, goLog }: { date: string; setDat
     <div className="page">
       <header className="page-head">
         <h1>{t('day.title')}</h1>
-        {s.entries.length > 0 && (
-          <button className="btn small ghost" disabled={sharing} onClick={doShare}>{t('day.share')}</button>
-        )}
       </header>
       <DateBar date={date} setDate={setDate} />
+      {s.entries.length > 0 && (
+        <div className="share-tools">
+          <ShareStyleBar />
+          <div className="row gap">
+            <button className="btn ghost grow" disabled={sharing} onClick={() => doShare(false)}>{t('share.preview')}</button>
+            <button className="btn primary grow" disabled={sharing} onClick={() => doShare(true)}>{t('day.share')}</button>
+          </div>
+        </div>
+      )}
 
       {s.entries.length === 0 ? (
-        <Empty icon="😴" title={t('day.emptyTitle')} text={t('day.emptyText')}>
-          <button className="btn primary" onClick={goLog}>{t('day.goLog')}</button>
-        </Empty>
+        <>
+          <Empty icon="😴" title={t('day.emptyTitle')} text={t('day.emptyText')}>
+            <button className="btn primary" onClick={goLog}>{t('day.goLog')}</button>
+          </Empty>
+          {recentPrs.length > 0 && (
+            <section className="card">
+              <h2 className="card-title">{t('month.prTimeline')}</h2>
+              <PrTimelineList events={recentPrs} />
+            </section>
+          )}
+        </>
       ) : (
         <>
           <section className="card">
@@ -167,6 +187,10 @@ export default function DayPage({ date, setDate, goLog }: { date: string; setDat
               })}
             </div>
             <p className="muted small note">{t('day.epleyNote')}</p>
+          </section>
+          <section className="card">
+            <h2 className="card-title">{t('month.prTimeline')}</h2>
+            <PrTimelineList events={recentPrs} />
           </section>
           {previewUrl && (
             <section className="card share-preview-wrap">

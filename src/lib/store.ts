@@ -8,6 +8,21 @@ export interface Profile { name: string; sex: 'male' | 'female'; age: number | n
 export interface WeightLog { date: string; kg: number }
 export type Theme = 'auto' | 'dark' | 'light';
 export type Locale = 'en' | 'zh-TW';
+/** Weekly template. Indexed by JS getDay(): 0 Sunday … 6 Saturday. */
+export type PlanFocus = 'push' | 'pull' | 'legs' | 'rest';
+export type ShareStyle = 'neon' | 'poster' | 'grid';
+export const PLAN_CYCLE: PlanFocus[] = ['push', 'pull', 'legs', 'rest'];
+/** Sun rest, then Push / Pull / Legs repeating. */
+export const DEFAULT_PLAN: PlanFocus[] = ['rest', 'push', 'pull', 'legs', 'push', 'pull', 'legs'];
+
+export interface Settings {
+  theme: Theme;
+  locale: Locale;
+  /** Default rest between sets, in seconds. */
+  restSec: number;
+  plan: PlanFocus[];
+  shareStyle: ShareStyle;
+}
 export interface AppData {
   app: 'janson-fit';
   version: 1;
@@ -15,8 +30,36 @@ export interface AppData {
   weights: WeightLog[];
   entries: LogEntry[];
   custom: Exercise[];
-  settings: { theme: Theme; locale: Locale };
+  settings: Settings;
   updatedAt?: number;
+}
+
+export function clampRest(n: unknown): number {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return 90;
+  return Math.min(300, Math.max(15, Math.round(v)));
+}
+
+function normalizePlan(p: unknown): PlanFocus[] {
+  const ok = (x: unknown): x is PlanFocus => x === 'push' || x === 'pull' || x === 'legs' || x === 'rest';
+  if (!Array.isArray(p) || p.length !== 7 || !p.every(ok)) return [...DEFAULT_PLAN];
+  return [...p];
+}
+
+function normalizeStyle(s: unknown): ShareStyle {
+  return s === 'poster' || s === 'grid' || s === 'neon' ? s : 'neon';
+}
+
+export function focusOn(plan: PlanFocus[] | undefined, dateKey: string): PlanFocus {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const dow = new Date(y, (m || 1) - 1, d || 1).getDay();
+  const src = plan && plan.length === 7 ? plan : DEFAULT_PLAN;
+  return src[dow] ?? 'rest';
+}
+
+export function nextFocus(f: PlanFocus): PlanFocus {
+  const i = PLAN_CYCLE.indexOf(f);
+  return PLAN_CYCLE[(i + 1) % PLAN_CYCLE.length];
 }
 
 const KEY = 'janson-fit-v1';
@@ -33,7 +76,7 @@ export const emptyData = (): AppData => ({
   app: 'janson-fit', version: 1,
   profile: { name: '', sex: 'male', age: null, heightCm: null, weightKg: null },
   weights: [], entries: [], custom: [],
-  settings: { theme: 'auto', locale: detectLocale() },
+  settings: { theme: 'auto', locale: detectLocale(), restSec: 90, plan: [...DEFAULT_PLAN], shareStyle: 'neon' },
   updatedAt: Date.now(),
 });
 
@@ -78,8 +121,16 @@ export function normalize(x: unknown): AppData {
   if (!x || typeof x !== 'object') throw new Error('Not a valid backup file.');
   const o = x as Partial<AppData>;
   if (!Array.isArray(o.entries)) throw new Error('Not a valid backup file (no workouts found).');
-  const settings = { ...e.settings, ...(o.settings ?? {}) };
-  if (settings.locale !== 'en' && settings.locale !== 'zh-TW') settings.locale = e.settings.locale;
+  const raw = (o.settings ?? {}) as Partial<Settings>;
+  const settings: Settings = {
+    ...e.settings,
+    ...raw,
+    locale: raw.locale === 'en' || raw.locale === 'zh-TW' ? raw.locale : e.settings.locale,
+    restSec: clampRest(raw.restSec),
+    plan: normalizePlan(raw.plan),
+    shareStyle: normalizeStyle(raw.shareStyle),
+  };
+  if (settings.theme !== 'auto' && settings.theme !== 'dark' && settings.theme !== 'light') settings.theme = e.settings.theme;
   const weights = Array.isArray(o.weights)
     ? o.weights
       .filter((w) => w && typeof w.kg === 'number' && typeof w.date === 'string')
@@ -174,6 +225,17 @@ export const actions = {
   deleteCustom(id: string) { setData((d) => ({ ...d, custom: d.custom.filter((c) => c.id !== id), entries: d.entries.filter((e) => e.exId !== id) })); },
   setTheme(theme: Theme) { setData((d) => ({ ...d, settings: { ...d.settings, theme } })); },
   setLocale(locale: Locale) { setData((d) => ({ ...d, settings: { ...d.settings, locale } })); },
+  setRestSec(sec: number) { setData((d) => ({ ...d, settings: { ...d.settings, restSec: clampRest(sec) } })); },
+  setPlanDay(dow: number, focus: PlanFocus) {
+    setData((d) => {
+      if (dow < 0 || dow > 6) return d;
+      const plan = (d.settings.plan?.length === 7 ? d.settings.plan : DEFAULT_PLAN).slice();
+      plan[dow] = focus;
+      return { ...d, settings: { ...d.settings, plan } };
+    });
+  },
+  resetPlan() { setData((d) => ({ ...d, settings: { ...d.settings, plan: [...DEFAULT_PLAN] } })); },
+  setShareStyle(shareStyle: ShareStyle) { setData((d) => ({ ...d, settings: { ...d.settings, shareStyle } })); },
   replaceAll(d: AppData) { setData(() => d); },
   clearAll() { setData((d) => ({ ...emptyData(), settings: d.settings })); },
 };

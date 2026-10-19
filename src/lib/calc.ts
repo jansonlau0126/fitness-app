@@ -1,4 +1,5 @@
-import { EXERCISES, trackingOf, type Exercise, type Muscle, type BodyPart } from '../data/exercises';
+import { EXERCISES, KEY_LIFTS, trackingOf, type Exercise, type Muscle, type BodyPart } from '../data/exercises';
+import { addMonths, daysInMonth } from './date';
 import { STANDARDS, type LiftStandard } from '../data/standards';
 import { AGE_SHARED, AGE_SPECIAL } from '../data/age';
 import type { AppData, LogEntry, SetEntry } from './store';
@@ -226,6 +227,54 @@ export function levelFor(value: number, th: number[]): LevelInfo {
 }
 export function stdFor(ex: Exercise | undefined): LiftStandard | undefined {
   return ex?.std ? STANDARDS[ex.std] : undefined;
+}
+
+export interface PrEvent { exId: string; date: string; value: number; prev: number }
+
+/** All-time PRs in reverse chronological order (a set that beat the previous best). */
+export function prTimeline(d: AppData): PrEvent[] {
+  const m = exMap(d);
+  const sorted = [...d.entries].sort((a, b) => a.date.localeCompare(b.date) || a.t - b.t);
+  const best = new Map<string, number>();
+  const events: PrEvent[] = [];
+  for (const en of sorted) {
+    const ex = m.get(en.exId);
+    const v = metricOf(ex, entryStats(en, !!ex?.bw || trackingOf(ex) === 'reps'));
+    if (v <= 0) continue;
+    const prev = best.get(en.exId);
+    if (prev === undefined) best.set(en.exId, v);
+    else if (v > prev) {
+      events.push({ exId: en.exId, date: en.date, value: v, prev });
+      best.set(en.exId, v);
+    }
+  }
+  events.reverse();
+  return events;
+}
+
+export interface LiftDelta { exId: string; value: number; prev: number | null }
+
+/** Best metric this month vs last month. Key lifts first, then the biggest moves. */
+export function monthLiftDeltas(d: AppData, month: string, limit = 3): LiftDelta[] {
+  const prevMonth = addMonths(month, -1);
+  const end = `${month}-${String(daysInMonth(month)).padStart(2, '0')}`;
+  const prevEnd = `${prevMonth}-${String(daysInMonth(prevMonth)).padStart(2, '0')}`;
+  const cur = bestByExercise(d, `${month}-01`, end);
+  const prev = bestByExercise(d, `${prevMonth}-01`, prevEnd);
+  const rows: LiftDelta[] = [];
+  cur.forEach((v, exId) => rows.push({ exId, value: v.value, prev: prev.get(exId)?.value ?? null }));
+  const rank = (id: string) => { const i = KEY_LIFTS.indexOf(id); return i < 0 ? 100 : i; };
+  rows.sort((a, b) => {
+    const bothA = a.prev != null ? 0 : 1;
+    const bothB = b.prev != null ? 0 : 1;
+    if (bothA !== bothB) return bothA - bothB;
+    const ra = rank(a.exId), rb = rank(b.exId);
+    if (ra !== rb && (ra < 100 || rb < 100)) return ra - rb;
+    const ad = a.prev == null ? 0 : Math.abs(a.value - a.prev);
+    const bd = b.prev == null ? 0 : Math.abs(b.value - b.prev);
+    return bd - ad;
+  });
+  return rows.slice(0, limit);
 }
 
 export function strengthResults(d: AppData, keys: string[], to = '9999-99-99') {
