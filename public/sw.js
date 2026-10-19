@@ -1,5 +1,5 @@
 // Simple offline cache. Network first for pages, cache first for files.
-const CACHE = 'gym-everyday-v14'; // bump this on each release so old caches are dropped
+const CACHE = 'gym-everyday-v15'; // bump this on each release so old caches are dropped
 self.addEventListener('install', (e) => {
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll([
