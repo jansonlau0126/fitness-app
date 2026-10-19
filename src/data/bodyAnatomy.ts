@@ -1,8 +1,9 @@
 import type { Muscle } from './exercises';
 
 export type Region = { m: Muscle; d: string; hi?: string };
+export type BodyTheme = 'a' | 'c';
 
-/** Anatomical stylised body (v2). Left half only; mirrored. ViewBox 0 0 200 500. */
+/** Anatomical stylised body. Left half only; mirrored. ViewBox 0 0 200 500. */
 export const OUTLINE =
   'M100,46 C95,46 91,47 89,51 C88,58 86,65 82,70 C74,74 62,76 54,80 C44,85 38,96 37,110 ' +
   'C35,128 34,146 33,162 C32,174 31,184 30,194 C27,214 24,236 23,258 C21,272 19,288 23,300 ' +
@@ -56,38 +57,58 @@ function muscleKind(m: Muscle, primary: Set<Muscle>, secondary: Set<Muscle>, bac
   return 'base';
 }
 
-/** Standalone SVG markup — identical paths/gradients to in-app anatomical-v2 (inline fills for rasterization). */
+/** Theme A — semi-realistic 3D mannequin (Summary). Theme C — neon fiber outlines (share). */
 export function buildBodyViewSvg(
   primary: Iterable<Muscle>,
   secondary: Iterable<Muscle>,
   back: boolean,
   uid: string,
+  theme: BodyTheme = 'a',
 ): string {
   const pri = primary instanceof Set ? primary : new Set(primary);
   const sec = secondary instanceof Set ? secondary : new Set(secondary);
   const regions = back ? BACK : FRONT;
   const line = back ? 'M100,56 L100,236' : 'M100,78 L100,128';
 
-  const fillFor = (kind: 'pri' | 'sec' | 'base') => {
-    if (kind === 'pri') return `url(#pri-${uid})`;
-    if (kind === 'sec') return `url(#sec-${uid})`;
-    return '#3a3348';
-  };
-  const strokeFor = (kind: 'pri' | 'sec' | 'base') => {
-    if (kind === 'pri') return '#ffd4a0';
-    if (kind === 'sec') return '#ffc8a0';
-    return '#120c1c';
-  };
-  const swFor = (kind: 'pri' | 'sec' | 'base') => (kind === 'pri' ? '1.6' : kind === 'sec' ? '1.2' : '1.1');
-  const filt = (kind: 'pri' | 'sec' | 'base') => (kind === 'pri' ? ` filter="url(#glow-${uid})"` : '');
+  if (theme === 'c') return buildThemeC(regions, pri, sec, back, uid, line);
+  return buildThemeA(regions, pri, sec, back, uid, line);
+}
 
+function buildThemeA(
+  regions: Region[],
+  pri: Set<Muscle>,
+  sec: Set<Muscle>,
+  back: boolean,
+  uid: string,
+  line: string,
+): string {
   const pathPair = (r: Region) => {
     const kind = muscleKind(r.m, pri, sec, back);
-    const attrs = `d="${r.d}" fill="${fillFor(kind)}" stroke="${strokeFor(kind)}" stroke-width="${swFor(kind)}" stroke-linejoin="round"${filt(kind)}`;
+    let fill: string;
+    let stroke: string;
+    let sw: string;
+    let filt = '';
+    let op = '';
+    if (kind === 'pri') {
+      fill = `url(#priA-${uid})`;
+      stroke = '#ffd4a8';
+      sw = '1.35';
+      filt = ` filter="url(#glowA-${uid})"`;
+      op = ' fill-opacity="0.88"';
+    } else if (kind === 'sec') {
+      fill = `url(#secA-${uid})`;
+      stroke = '#ffc8a0';
+      sw = '1.15';
+      op = ' fill-opacity="0.72"';
+    } else {
+      fill = `url(#musA-${uid})`;
+      stroke = '#1a1424';
+      sw = '1.05';
+    }
     const hi = r.hi
-      ? `<path d="${r.hi}" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="1.4" stroke-linecap="round"/>`
+      ? `<path d="${r.hi}" fill="none" stroke="rgba(255,245,230,.28)" stroke-width="1.5" stroke-linecap="round"/>`
       : '';
-    return `<path ${attrs}/>${hi}`;
+    return `<path d="${r.d}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round"${filt}${op}/>${hi}`;
   };
 
   const left = regions.map(pathPair).join('');
@@ -96,62 +117,151 @@ export function buildBodyViewSvg(
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 500" width="200" height="500">
   <defs>
-    <linearGradient id="sil-${uid}" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#3a3348"/>
-      <stop offset="45%" stop-color="#2a2438"/>
-      <stop offset="100%" stop-color="#1a1428"/>
+    <linearGradient id="skinA-${uid}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5a5368"/>
+      <stop offset="28%" stop-color="#3e384c"/>
+      <stop offset="62%" stop-color="#2a2436"/>
+      <stop offset="100%" stop-color="#16101f"/>
     </linearGradient>
-    <radialGradient id="shine-${uid}" cx="32%" cy="28%" r="55%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.16"/>
+    <linearGradient id="musA-${uid}" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0%" stop-color="#625a70"/>
+      <stop offset="40%" stop-color="#433c52"/>
+      <stop offset="100%" stop-color="#2c2638"/>
+    </linearGradient>
+    <radialGradient id="specA-${uid}" cx="34%" cy="22%" r="58%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.28"/>
+      <stop offset="45%" stop-color="#ffd0a0" stop-opacity="0.08"/>
       <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
     </radialGradient>
-    <filter id="glow-${uid}" x="-40%" y="-40%" width="180%" height="180%">
-      <feGaussianBlur stdDeviation="2.2" result="b"/>
-      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    <radialGradient id="rimA-${uid}" cx="78%" cy="48%" r="70%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="70%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.45"/>
+    </radialGradient>
+    <filter id="softA-${uid}" x="-20%" y="-10%" width="140%" height="120%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3.5" result="b"/>
+      <feOffset dy="6" result="o"/>
+      <feFlood flood-color="#000" flood-opacity="0.45"/>
+      <feComposite in2="o" operator="in" result="sh"/>
+      <feMerge><feMergeNode in="sh"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
-    <linearGradient id="pri-${uid}" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#ffb06a"/>
-      <stop offset="55%" stop-color="#ff6a2a"/>
+    <filter id="glowA-${uid}" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3.2" result="b"/>
+      <feFlood flood-color="#ff7a30" flood-opacity="0.55" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="priA-${uid}" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffd4a0"/>
+      <stop offset="35%" stop-color="#ff9a4a"/>
+      <stop offset="70%" stop-color="#ff6a28"/>
       <stop offset="100%" stop-color="#e84810"/>
     </linearGradient>
-    <linearGradient id="sec-${uid}" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#ffd4b0"/>
-      <stop offset="100%" stop-color="#ffb080"/>
+    <linearGradient id="secA-${uid}" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffe0c0"/>
+      <stop offset="100%" stop-color="#ffb888"/>
     </linearGradient>
   </defs>
-  <ellipse cx="100" cy="28" rx="18" ry="22" fill="url(#sil-${uid})"/>
-  <path d="${OUTLINE}" fill="url(#sil-${uid})"/>
-  <path d="${OUTLINE}" transform="translate(200,0) scale(-1,1)" fill="url(#sil-${uid})"/>
-  <rect x="0" y="0" width="200" height="500" fill="url(#shine-${uid})" pointer-events="none"/>
-  <path d="${line}" fill="none" stroke="rgba(255,200,160,.25)" stroke-width="1.2"/>
+  <g filter="url(#softA-${uid})">
+    <ellipse cx="100" cy="28" rx="18" ry="22" fill="url(#skinA-${uid})"/>
+    <path d="${OUTLINE}" fill="url(#skinA-${uid})"/>
+    <path d="${OUTLINE}" transform="translate(200,0) scale(-1,1)" fill="url(#skinA-${uid})"/>
+  </g>
+  <path d="${line}" fill="none" stroke="rgba(255,210,170,.18)" stroke-width="1.1"/>
   <g>${left}</g>
   <g transform="translate(200,0) scale(-1,1)">${right}</g>
+  <rect x="0" y="0" width="200" height="500" fill="url(#specA-${uid})" pointer-events="none"/>
+  <rect x="0" y="0" width="200" height="500" fill="url(#rimA-${uid})" pointer-events="none"/>
 </svg>`;
 }
 
-export async function rasterizeBodySvg(
-  primary: Iterable<Muscle>,
-  secondary: Iterable<Muscle>,
+function buildThemeC(
+  regions: Region[],
+  pri: Set<Muscle>,
+  sec: Set<Muscle>,
   back: boolean,
   uid: string,
-  pixelH = 900,
-): Promise<HTMLImageElement> {
-  const svg = buildBodyViewSvg(primary, secondary, back, uid);
-  const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  try {
-    const img = new Image();
-    img.decoding = 'sync';
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error('svg-raster-fail'));
-      img.src = url;
-    });
-    // force size hint
-    void pixelH;
-    return img;
-  } finally {
-    // revoke after a tick so drawImage can use it
-    setTimeout(() => URL.revokeObjectURL(url), 0);
-  }
+  line: string,
+): string {
+  const pathPair = (r: Region) => {
+    const kind = muscleKind(r.m, pri, sec, back);
+    let fill: string;
+    let stroke: string;
+    let sw: string;
+    let filt = '';
+    let hiStroke = 'rgba(180,120,255,.35)';
+    let hiW = '1.2';
+    if (kind === 'pri') {
+      fill = 'rgba(255,90,30,0.12)';
+      stroke = '#ff9a40';
+      sw = '3.1';
+      filt = ` filter="url(#neonO-${uid})"`;
+      hiStroke = '#ffe8b0';
+      hiW = '2.2';
+    } else if (kind === 'sec') {
+      fill = 'rgba(255,40,200,0.10)';
+      stroke = '#ff3dc8';
+      sw = '2.5';
+      filt = ` filter="url(#neonM-${uid})"`;
+      hiStroke = '#ffc0f0';
+      hiW = '1.9';
+    } else {
+      fill = 'rgba(8,4,18,0.75)';
+      stroke = '#6a40c8';
+      sw = '1.35';
+      filt = ` filter="url(#edgeC-${uid})"`;
+    }
+    const hi = r.hi
+      ? `<path d="${r.hi}" fill="none" stroke="${hiStroke}" stroke-width="${hiW}" stroke-linecap="round"${kind !== 'base' ? filt : ''}/>`
+      : '';
+    return `<path d="${r.d}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round"${filt}/>${hi}`;
+  };
+
+  const left = regions.map(pathPair).join('');
+  const right = regions.map(pathPair).join('');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 500" width="200" height="500">
+  <defs>
+    <linearGradient id="midC-${uid}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#140a28"/>
+      <stop offset="100%" stop-color="#05030c"/>
+    </linearGradient>
+    <linearGradient id="silC-${uid}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a1028"/>
+      <stop offset="100%" stop-color="#080410"/>
+    </linearGradient>
+    <filter id="neonO-${uid}" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="5.2" result="b"/>
+      <feFlood flood-color="#ff6a20" flood-opacity="0.85" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="neonM-${uid}" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="4.4" result="b"/>
+      <feFlood flood-color="#ff2a9a" flood-opacity="0.8" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="edgeC-${uid}" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1.6" result="b"/>
+      <feFlood flood-color="#7a4cff" flood-opacity="0.55" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <radialGradient id="flareC-${uid}" cx="50%" cy="18%" r="55%">
+      <stop offset="0%" stop-color="#ff6a30" stop-opacity="0.22"/>
+      <stop offset="50%" stop-color="#a040ff" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="200" height="500" fill="url(#midC-${uid})"/>
+  <rect width="200" height="500" fill="url(#flareC-${uid})"/>
+  <ellipse cx="100" cy="28" rx="18" ry="22" fill="url(#silC-${uid})" stroke="#5a3a8a" stroke-width="1.4" filter="url(#edgeC-${uid})"/>
+  <path d="${OUTLINE}" fill="url(#silC-${uid})" stroke="#4a2e78" stroke-width="1.5" filter="url(#edgeC-${uid})"/>
+  <path d="${OUTLINE}" transform="translate(200,0) scale(-1,1)" fill="url(#silC-${uid})" stroke="#4a2e78" stroke-width="1.5" filter="url(#edgeC-${uid})"/>
+  <path d="${line}" fill="none" stroke="rgba(255,100,200,.35)" stroke-width="1.3" stroke-dasharray="3 4"/>
+  <g>${left}</g>
+  <g transform="translate(200,0) scale(-1,1)">${right}</g>
+</svg>`;
 }

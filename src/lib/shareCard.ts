@@ -73,10 +73,10 @@ export async function renderShareCard(p: SharePayload): Promise<Blob> {
   ctx.fillText(p.dateLabel, PAD, 240);
 
   const bodyY = headerH + 10;
-  const bodyDrawH = 640;
+  const bodyDrawH = 680;
   const bodyDrawW = bodyDrawH * (200 / 500);
-  const frontImg = await svgToImage(buildBodyViewSvg(p.primary, p.secondary, false, 'share-fr'));
-  const backImg = await svgToImage(buildBodyViewSvg(p.primary, p.secondary, true, 'share-bk'));
+  const frontImg = await svgToImage(buildBodyViewSvg(p.primary, p.secondary, false, 'share-fr', 'c'));
+  const backImg = await svgToImage(buildBodyViewSvg(p.primary, p.secondary, true, 'share-bk', 'c'));
   ctx.drawImage(frontImg, PAD + 40, bodyY, bodyDrawW, bodyDrawH);
   ctx.drawImage(backImg, W / 2 + 40, bodyY, bodyDrawW, bodyDrawH);
   ctx.fillStyle = '#c8b8d8';

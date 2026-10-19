@@ -403,6 +403,16 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 
 /* Anatomical body map v2 — unmistakable vs flat blocks */
 .body-map.anatomical-v2 { gap: 10px; padding: 4px 0 8px; }
+
+/* Theme A — 3D mannequin (Summary) */
+.body-map.theme-a { gap: 12px; padding: 6px 0 10px; }
+.body-view.theme-a svg { filter: drop-shadow(0 10px 22px rgba(0,0,0,.42)); }
+.body-view.theme-a .line { stroke: rgba(255,210,170,.18); stroke-width: 1.1; }
+.body-view.theme-a .mus.focus {
+  stroke: #fff !important; stroke-width: 2.2 !important;
+  filter: drop-shadow(0 0 10px rgba(255,140,60,.85)) !important;
+}
+
 .body-view.anatomical .mus { fill: #3a3348; stroke: #120c1c; stroke-width: 1.1; }
 .body-view.anatomical .mus.pri {
   stroke: #ffd4a0 !important; stroke-width: 1.6 !important;

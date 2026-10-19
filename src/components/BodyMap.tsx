@@ -9,6 +9,7 @@ export interface BodyMapProps {
   interactive?: boolean;
 }
 
+/** In-app Summary: Theme A — semi-realistic 3D mannequin. Same hit regions as share Theme C. */
 function View({ regions, primary, secondary, back, label, active, onMuscle, interactive }: {
   regions: Region[]; primary: Set<Muscle>; secondary: Set<Muscle>; back?: boolean; label: string;
   active?: Muscle | null; onMuscle?: (m: Muscle, trained: boolean) => void; interactive?: boolean;
@@ -37,54 +38,83 @@ function View({ regions, primary, secondary, back, label, active, onMuscle, inte
         <title>{r.m}</title>
       </path>
       {r.hi && (
-        <path className="mus-hi" d={r.hi} fill="none" stroke="rgba(255,255,255,.22)" strokeWidth="1.4"
+        <path className="mus-hi" d={r.hi} fill="none" stroke="rgba(255,245,230,.28)" strokeWidth="1.5"
           strokeLinecap="round" style={{ pointerEvents: 'none' }} />
       )}
     </g>
   ));
 
   return (
-    <figure className={`body-view anatomical ${interactive ? 'interactive' : ''}`}>
-      <svg viewBox="0 0 200 500" role="img" aria-label={`${label} anatomical body`}>
+    <figure className={`body-view theme-a ${interactive ? 'interactive' : ''}`}>
+      <svg viewBox="0 0 200 500" role="img" aria-label={`${label} 3D mannequin`}>
         <defs>
-          <linearGradient id={`sil-${uid}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3a3348" />
-            <stop offset="45%" stopColor="#2a2438" />
-            <stop offset="100%" stopColor="#1a1428" />
+          <linearGradient id={`skinA-${uid}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#5a5368" />
+            <stop offset="28%" stopColor="#3e384c" />
+            <stop offset="62%" stopColor="#2a2436" />
+            <stop offset="100%" stopColor="#16101f" />
           </linearGradient>
-          <radialGradient id={`shine-${uid}`} cx="32%" cy="28%" r="55%">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.16" />
+          <linearGradient id={`musA-${uid}`} x1="0.15" y1="0" x2="0.85" y2="1">
+            <stop offset="0%" stopColor="#625a70" />
+            <stop offset="40%" stopColor="#433c52" />
+            <stop offset="100%" stopColor="#2c2638" />
+          </linearGradient>
+          <radialGradient id={`specA-${uid}`} cx="34%" cy="22%" r="58%">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.28" />
+            <stop offset="45%" stopColor="#ffd0a0" stopOpacity="0.08" />
             <stop offset="100%" stopColor="#000000" stopOpacity="0" />
           </radialGradient>
-          <filter id={`glow-${uid}`} x="-40%" y="-40%" width="180%" height="180%">
-            <feGaussianBlur stdDeviation="2.2" result="b" />
-            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          <radialGradient id={`rimA-${uid}`} cx="78%" cy="48%" r="70%">
+            <stop offset="0%" stopColor="#000000" stopOpacity="0" />
+            <stop offset="70%" stopColor="#000000" stopOpacity="0" />
+            <stop offset="100%" stopColor="#000000" stopOpacity="0.45" />
+          </radialGradient>
+          <filter id={`softA-${uid}`} x="-20%" y="-10%" width="140%" height="120%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="3.5" result="b" />
+            <feOffset dy="6" result="o" />
+            <feFlood floodColor="#000" floodOpacity="0.45" />
+            <feComposite in2="o" operator="in" result="sh" />
+            <feMerge><feMergeNode in="sh" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
-          <linearGradient id={`pri-${uid}`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#ffb06a" />
-            <stop offset="55%" stopColor="#ff6a2a" />
+          <filter id={`glowA-${uid}`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3.2" result="b" />
+            <feFlood floodColor="#ff7a30" floodOpacity="0.55" result="c" />
+            <feComposite in="c" in2="b" operator="in" result="g" />
+            <feMerge><feMergeNode in="g" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+          <linearGradient id={`priA-${uid}`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#ffd4a0" />
+            <stop offset="35%" stopColor="#ff9a4a" />
+            <stop offset="70%" stopColor="#ff6a28" />
             <stop offset="100%" stopColor="#e84810" />
           </linearGradient>
-          <linearGradient id={`sec-${uid}`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#ffd4b0" />
-            <stop offset="100%" stopColor="#ffb080" />
+          <linearGradient id={`secA-${uid}`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#ffe0c0" />
+            <stop offset="100%" stopColor="#ffb888" />
           </linearGradient>
         </defs>
-        <g className="sil">
-          <ellipse cx="100" cy="28" rx="18" ry="22" fill={`url(#sil-${uid})`} />
-          <path d={OUTLINE} fill={`url(#sil-${uid})`} />
-          <path d={OUTLINE} transform="translate(200,0) scale(-1,1)" fill={`url(#sil-${uid})`} />
-          <rect x="0" y="0" width="200" height="500" fill={`url(#shine-${uid})`} style={{ pointerEvents: 'none' }} />
+        <g className="sil" filter={`url(#softA-${uid})`}>
+          <ellipse cx="100" cy="28" rx="18" ry="22" fill={`url(#skinA-${uid})`} />
+          <path d={OUTLINE} fill={`url(#skinA-${uid})`} />
+          <path d={OUTLINE} transform="translate(200,0) scale(-1,1)" fill={`url(#skinA-${uid})`} />
         </g>
         {back
           ? <path className="line" d="M100,56 L100,236" />
           : <path className="line" d="M100,78 L100,128" />}
         <style>{`
-          .body-view.anatomical .mus.pri { fill: url(#pri-${uid}); filter: url(#glow-${uid}); }
-          .body-view.anatomical .mus.sec { fill: url(#sec-${uid}); opacity: 0.92; }
+          .body-view.theme-a .mus { fill: url(#musA-${uid}); stroke: #1a1424; stroke-width: 1.05; }
+          .body-view.theme-a .mus.pri {
+            fill: url(#priA-${uid}); fill-opacity: 0.88; stroke: #ffd4a8; stroke-width: 1.35;
+            filter: url(#glowA-${uid});
+          }
+          .body-view.theme-a .mus.sec {
+            fill: url(#secA-${uid}); fill-opacity: 0.72; stroke: #ffc8a0; stroke-width: 1.15;
+          }
         `}</style>
         <g>{paths}</g>
         <g transform="translate(200,0) scale(-1,1)">{paths}</g>
+        <rect x="0" y="0" width="200" height="500" fill={`url(#specA-${uid})`} style={{ pointerEvents: 'none' }} />
+        <rect x="0" y="0" width="200" height="500" fill={`url(#rimA-${uid})`} style={{ pointerEvents: 'none' }} />
       </svg>
       <figcaption>{label}</figcaption>
     </figure>
@@ -93,7 +123,7 @@ function View({ regions, primary, secondary, back, label, active, onMuscle, inte
 
 export default function BodyMap({ primary, secondary, active, onMuscle, interactive }: BodyMapProps) {
   return (
-    <div className="body-map anatomical-v2">
+    <div className="body-map theme-a anatomical-v2">
       <View regions={FRONT} primary={primary} secondary={secondary} label="Front" active={active} onMuscle={onMuscle} interactive={interactive} />
       <View regions={BACK} primary={primary} secondary={secondary} back label="Back" active={active} onMuscle={onMuscle} interactive={interactive} />
     </div>
