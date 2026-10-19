@@ -49,5 +49,5 @@ export function makeDemo(): AppData {
   }
   const weights = Array.from({ length: 7 }, (_, k) => ({ date: addDays(start, k * 7), kg: Math.round((76.4 - k * 0.25 + (r() - 0.5) * 0.4) * 10) / 10 }));
   const d = emptyData();
-  return { ...d, profile: { name: 'Janson', sex: 'male', age: 32, heightCm: 175, weightKg: weights[weights.length - 1].kg }, weights, entries };
+  return { ...d, profile: { name: 'Athlete', sex: 'male', age: 32, heightCm: 175, weightKg: weights[weights.length - 1].kg }, weights, entries };
 }

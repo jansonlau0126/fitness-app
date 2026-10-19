@@ -11,6 +11,7 @@ import { buildDayShare, pngSize, renderShareCard, shareOrDownload } from '../lib
 import { useData } from '../lib/store';
 import { niceDay } from '../lib/date';
 import { exName, exNameEn, muscleLabel, partLabelI18n, useI18n } from '../i18n';
+import { SHARE_FOOTER } from '../lib/publicSite';
 
 export default function DayPage({ date, setDate, goLog }: { date: string; setDate: (d: string) => void; goLog: () => void }) {
   const data = useData();
@@ -66,7 +67,7 @@ export default function DayPage({ date, setDate, goLog }: { date: string; setDat
         title: t('share.title'),
         subtitle: t('brand.slogan'),
         dateLabel: niceDay(date) + ' · ' + date,
-        footer: 'jansonlau0126.github.io/fitness-app · Gym Everyday',
+        footer: SHARE_FOOTER,
         locale,
         nameOf: (ex) => exName(ex, locale),
       });
