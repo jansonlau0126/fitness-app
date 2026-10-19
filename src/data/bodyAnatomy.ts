@@ -265,3 +265,73 @@ function buildThemeC(
   <g transform="translate(200,0) scale(-1,1)">${right}</g>
 </svg>`;
 }
+
+
+/** Transparent glow-only overlay (pri/sec) for compositing on HQ base art. */
+export function buildGlowOverlaySvg(
+  primary: Iterable<Muscle>,
+  secondary: Iterable<Muscle>,
+  back: boolean,
+  uid: string,
+  theme: BodyTheme = 'a',
+): string {
+  const pri = primary instanceof Set ? primary : new Set(primary);
+  const sec = secondary instanceof Set ? secondary : new Set(secondary);
+  const regions = back ? BACK : FRONT;
+
+  const pathPair = (r: Region) => {
+    const kind = muscleKind(r.m, pri, sec, back);
+    if (kind === 'base') {
+      // invisible hit target only used in React; for raster glow skip base
+      return '';
+    }
+    if (theme === 'c') {
+      if (kind === 'pri') {
+        return `<path d="${r.d}" fill="rgba(255,100,40,0.28)" stroke="#ff9a40" stroke-width="2.8" stroke-linejoin="round" filter="url(#gO-${uid})"/>` +
+          (r.hi ? `<path d="${r.hi}" fill="none" stroke="#ffe8b0" stroke-width="2" stroke-linecap="round" filter="url(#gO-${uid})"/>` : '');
+      }
+      return `<path d="${r.d}" fill="rgba(255,40,200,0.18)" stroke="#ff3dc8" stroke-width="2.2" stroke-linejoin="round" filter="url(#gM-${uid})"/>` +
+        (r.hi ? `<path d="${r.hi}" fill="none" stroke="#ffc0f0" stroke-width="1.6" stroke-linecap="round" filter="url(#gM-${uid})"/>` : '');
+    }
+    // theme A — translucent sunrise glow
+    if (kind === 'pri') {
+      return `<path d="${r.d}" fill="url(#gPri-${uid})" fill-opacity="0.72" stroke="#ffd4a8" stroke-width="1.2" stroke-linejoin="round" filter="url(#gA-${uid})"/>`;
+    }
+    return `<path d="${r.d}" fill="url(#gSec-${uid})" fill-opacity="0.55" stroke="#ffc8a0" stroke-width="1" stroke-linejoin="round"/>`;
+  };
+
+  const left = regions.map(pathPair).join('');
+  const right = regions.map(pathPair).join('');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 500" width="200" height="500">
+  <defs>
+    <linearGradient id="gPri-${uid}" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffd4a0"/><stop offset="55%" stop-color="#ff6a28"/><stop offset="100%" stop-color="#e84810"/>
+    </linearGradient>
+    <linearGradient id="gSec-${uid}" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffe0c0"/><stop offset="100%" stop-color="#ffb888"/>
+    </linearGradient>
+    <filter id="gA-${uid}" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3.5" result="b"/>
+      <feFlood flood-color="#ff7a30" flood-opacity="0.55" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="gO-${uid}" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="4.5" result="b"/>
+      <feFlood flood-color="#ff6a20" flood-opacity="0.9" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="gM-${uid}" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="3.8" result="b"/>
+      <feFlood flood-color="#ff2a9a" flood-opacity="0.85" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g>${left}</g>
+  <g transform="translate(200,0) scale(-1,1)">${right}</g>
+</svg>`;
+}

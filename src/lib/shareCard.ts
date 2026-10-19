@@ -2,7 +2,7 @@ import type { Exercise, Muscle } from '../data/exercises';
 import { trackingOf } from '../data/exercises';
 import { fmt, fmtInt, fmtSec, type DaySummary } from './calc';
 import type { Locale } from './store';
-import { buildBodyViewSvg } from '../data/bodyAnatomy';
+import { buildGlowOverlaySvg } from '../data/bodyAnatomy';
 
 export interface ShareLine {
   name: string;
@@ -75,10 +75,14 @@ export async function renderShareCard(p: SharePayload): Promise<Blob> {
   const bodyY = headerH + 10;
   const bodyDrawH = 680;
   const bodyDrawW = bodyDrawH * (200 / 500);
-  const frontImg = await svgToImage(buildBodyViewSvg(p.primary, p.secondary, false, 'share-fr', 'c'));
-  const backImg = await svgToImage(buildBodyViewSvg(p.primary, p.secondary, true, 'share-bk', 'c'));
-  ctx.drawImage(frontImg, PAD + 40, bodyY, bodyDrawW, bodyDrawH);
-  ctx.drawImage(backImg, W / 2 + 40, bodyY, bodyDrawW, bodyDrawH);
+  const frontBase = await loadBodyAsset('c-front');
+  const backBase = await loadBodyAsset('c-back');
+  ctx.drawImage(frontBase, PAD + 40, bodyY, bodyDrawW, bodyDrawH);
+  ctx.drawImage(backBase, W / 2 + 40, bodyY, bodyDrawW, bodyDrawH);
+  const frontGlow = await svgToImage(buildGlowOverlaySvg(p.primary, p.secondary, false, 'share-fr', 'c'));
+  const backGlow = await svgToImage(buildGlowOverlaySvg(p.primary, p.secondary, true, 'share-bk', 'c'));
+  ctx.drawImage(frontGlow, PAD + 40, bodyY, bodyDrawW, bodyDrawH);
+  ctx.drawImage(backGlow, W / 2 + 40, bodyY, bodyDrawW, bodyDrawH);
   ctx.fillStyle = '#c8b8d8';
   ctx.font = '800 32px system-ui';
   ctx.fillText('FRONT', PAD + 160, bodyY + bodyDrawH + 48);
@@ -159,6 +163,29 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
+}
+
+
+async function loadBodyAsset(name: 'a-front' | 'a-back' | 'c-front' | 'c-back'): Promise<HTMLImageElement> {
+  const base = new URL('./body/', window.location.href).href;
+  const tryUrls = [`${base}${name}.webp`, `${base}${name}.png`];
+  let lastErr: unknown;
+  for (const src of tryUrls) {
+    try {
+      const img = new Image();
+      img.decoding = 'async';
+      img.crossOrigin = 'anonymous';
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('body-asset-fail ' + src));
+        img.src = src;
+      });
+      return img;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr ?? new Error('body-asset-missing ' + name);
 }
 
 async function svgToImage(svg: string): Promise<HTMLImageElement> {
