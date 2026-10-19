@@ -8,7 +8,7 @@ import { makeDemo } from '../lib/demo';
 import { PHOTO_CREDIT_URL } from '../data/images';
 import { exName, levelLabel, useI18n, useLocaleActions } from '../i18n';
 import type { Locale } from '../lib/store';
-import { actions, normalize, useData, type Theme } from '../lib/store';
+import { actions, focusOn, nextFocus, normalize, useData, type PlanFocus, type Theme } from '../lib/store';
 import {
   googleConfigured, health, loadAuth, loadSyncMeta, signInWithGoogle, signOut, syncNow, type AuthUser,
 } from '../lib/sync';
@@ -63,6 +63,27 @@ export default function ProfilePage() {
           <NumberField label={t('profile.weight')} value={p.weightKg} onChange={(v) => actions.setProfile({ weightKg: v })} suffix="kg" />
         </div>
         {bmi && <p className="small muted">BMI: <b>{fmt(bmi)}</b> (a rough guide only)</p>}
+      </section>
+
+      <section className="card">
+        <h2 className="card-title">{t('plan.title')}</h2>
+        <p className="small muted">{t('plan.blurb')}</p>
+        <div className="plan-week">
+          {[1, 2, 3, 4, 5, 6, 0].map((dow) => {
+            const focus = (data.settings.plan[dow] ?? 'rest') as PlanFocus;
+            const isToday = new Date().getDay() === dow;
+            return (
+              <button key={dow} type="button" className={`plan-day focus-${focus} ${isToday ? 'today' : ''}`} onClick={() => actions.setPlanDay(dow, nextFocus(focus))}>
+                <span>{t(`plan.dow.${dow}`)}</span>
+                <b>{t(`plan.${focus}`)}</b>
+              </button>
+            );
+          })}
+        </div>
+        <p className="small muted plan-today-line">{t('plan.today')}: <b>{t(`plan.${focusOn(data.settings.plan, todayKey())}`)}</b></p>
+        <button className="btn ghost small" onClick={() => actions.resetPlan()}>{t('plan.reset')}</button>
+        <RestDefault />
+        <p className="small muted">{t('profile.restHint')}</p>
       </section>
 
       <section className="card">
@@ -194,6 +215,24 @@ export default function ProfilePage() {
       </section>
       <p className="center-text small muted">{t('profile.madeFor')}</p>
     </div>
+  );
+}
+
+function RestDefault() {
+  const data = useData();
+  const { t } = useI18n();
+  const sec = data.settings.restSec;
+  return (
+    <label className="field" key={sec}>
+      <span className="field-label">{t('profile.restDefault')}</span>
+      <span className="num-wrap">
+        <input
+          className="num" inputMode="numeric" defaultValue={String(sec)} aria-label={t('profile.restDefault')}
+          onBlur={(e) => actions.setRestSec(Number(e.target.value.replace(/\D/g, '')) || 90)}
+        />
+        <span className="num-suffix">s</span>
+      </span>
+    </label>
   );
 }
 

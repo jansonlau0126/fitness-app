@@ -8,11 +8,12 @@ Live: https://jansonlau0126.github.io/fitness-app/
 
 ## Features
 - Daily workout log (weight × reps, bodyweight reps, timed holds)
-- Last-session reminder + all-time PR
+- Rest timer between sets, one-tap fill from last session, weekly Push / Pull / Legs plan
+- Last-session reminder + all-time PR timeline
 - Anatomical front/back muscle map (tappable)
 - Age-adjusted strength standards (strengthlevel.com data)
-- Month summary, badges, streaks
-- Share cards (day / month)
+- Month heat map, badges, streaks, compare vs last month
+- Share cards: Neon, Poster, and stats Grid (day / month)
 - English + 繁體中文
 - Offline PWA + optional Google cloud sync (Cloudflare Workers + D1)
 

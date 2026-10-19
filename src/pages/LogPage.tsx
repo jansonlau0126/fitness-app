@@ -8,6 +8,9 @@ import {
 import { addDays, shortDate } from '../lib/date';
 import { confirmDialog, DateBar, Empty, NumberField, Sheet, toast } from '../components/ui';
 import { ExThumb } from '../components/Thumb';
+import { PlanHint } from '../components/PlanHint';
+import { RestTimer } from '../components/RestTimer';
+import { restStart } from '../lib/restTimer';
 import { equipLabel, exName, exNameEn, partLabelI18n, useI18n } from '../i18n';
 
 export default function LogPage({ date, setDate, goSummary }: { date: string; setDate: (d: string) => void; goSummary: () => void }) {
@@ -29,6 +32,8 @@ export default function LogPage({ date, setDate, goSummary }: { date: string; se
         {entries.length > 0 && <span className="pill">{entries.length} {t('log.exercises')} · {totals.sets} {t('log.sets')}</span>}
       </header>
       <DateBar date={date} setDate={setDate} />
+      <PlanHint date={date} />
+      <RestTimer />
 
       {entries.length === 0 ? (
         <Empty icon="💪" title={t('log.emptyTitle')} text={t('log.emptyText')} />
@@ -116,7 +121,10 @@ export function EntryEditor({ entry, date, onClose, presetEx }: { entry: LogEntr
   };
 
   const upd = (i: number, k: 'w' | 'r' | 'sec', v: number | null) => setSets((s) => s.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
-  const addSet = () => setSets((s) => [...s, { ...(s[s.length - 1] ?? blankSet(ex)) }]);
+  const addSet = () => {
+    setSets((s) => [...s, { ...(s[s.length - 1] ?? blankSet(ex)) }]);
+    restStart(data.settings.restSec);
+  };
   const removeSet = (i: number) => setSets((s) => (s.length > 1 ? s.filter((_, j) => j !== i) : s));
 
   const clean: SetEntry[] = sets
@@ -192,16 +200,16 @@ export function EntryEditor({ entry, date, onClose, presetEx }: { entry: LogEntr
 
       {ex && last && (
         <div className="last-card">
-          <div className="last-head">
-            <div>
-              <div className="field-label">{t('editor.lastTime')}</div>
-              <div className="muted small">{shortDate(last.date)} · {last.date}</div>
-            </div>
-            <button className="btn small ghost" onClick={() => applyLast(last)}>{t('editor.copySets')}</button>
-          </div>
+          <div className="field-label">{t('editor.lastTime')}</div>
+          <div className="last-note">{t('editor.lastNote', {
+            when: shortDate(last.date),
+            sets: last.sets.length,
+            best: formatSet(ex, entryStats(last, trackingOf(ex) === 'reps').bestSet ?? last.sets[0]),
+          })}</div>
           <div className="set-chips">
             {last.sets.map((s, i) => <span className="set-chip" key={i}>{formatSet(ex, s)}</span>)}
           </div>
+          <button className="btn primary wide" onClick={() => applyLast(last)}>{t('editor.fillLast')}</button>
           {allTime && (
             <div className="last-pr muted small">{t('editor.allTimePr')}: <b className="accent">{formatMetric(ex, allTime.value)}</b>
               {allTime.date !== last.date && <> · {shortDate(allTime.date)}</>}
@@ -219,6 +227,7 @@ export function EntryEditor({ entry, date, onClose, presetEx }: { entry: LogEntr
       )}
 
       {ex && <>
+        <RestTimer />
         <div className="sets-head">
           <h3>{t('editor.sets')} <span className="pill">{sets.length}</span></h3>
           <span className="muted small">{tr === 'duration' ? t('log.bestTime') : tr === 'reps' ? t('log.bestSet') : t('log.bestEst')}</span>

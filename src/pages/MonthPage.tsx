@@ -2,9 +2,12 @@ import { exName, levelLabel, partLabelI18n, useI18n } from '../i18n';
 import { useMemo, useState } from 'react';
 import { buildMonthShare, renderShareCard, shareOrDownload } from '../lib/shareCard';
 import { BarList, LineChart, MonthCalendar, type Series } from '../components/Charts';
+import { PlanHint } from '../components/PlanHint';
+import { PrTimelineList } from '../components/PrTimeline';
+import { ShareStyleBar } from '../components/ShareStyleBar';
 import { Segmented, Stat, toast } from '../components/ui';
 import { BODY_PARTS, KEY_LIFTS, type BodyPart, type Muscle } from '../data/exercises';
-import { bestByExercise, entryStats, exMap, fmt, fmtInt, LEVEL_COLORS, LEVELS, strengthResults } from '../lib/calc';
+import { bestByExercise, entryStats, exMap, fmt, fmtInt, formatMetric, LEVEL_COLORS, LEVELS, monthLiftDeltas, prTimeline, strengthResults } from '../lib/calc';
 import { addDays, addMonths, daysInMonth, monthLabel, monthOf, monthShort, todayKey, weekKey, weeksInMonth } from '../lib/date';
 import { useData, type AppData } from '../lib/store';
 
@@ -18,15 +21,17 @@ function monthStats(d: AppData, month: string) {
   const m = exMap(d);
   const es = d.entries.filter((e) => monthOf(e.date) === month);
   const days = new Map<string, number>();
+  const volumes = new Map<string, number>();
   const parts = new Map<BodyPart, { sets: number; volume: number }>();
   let sets = 0, reps = 0, volume = 0;
   for (const e of es) {
     const st = entryStats(e); sets += st.sets; reps += st.reps; volume += st.volume;
     days.set(e.date, (days.get(e.date) ?? 0) + st.sets);
+    volumes.set(e.date, (volumes.get(e.date) ?? 0) + st.volume);
     const ex = m.get(e.exId);
     if (ex) { const p = parts.get(ex.part) ?? { sets: 0, volume: 0 }; p.sets += st.sets; p.volume += st.volume; parts.set(ex.part, p); }
   }
-  return { es, days, parts, sets, reps, volume };
+  return { es, days, volumes, parts, sets, reps, volume };
 }
 
 function longestStreak(days: string[]) {
@@ -50,7 +55,10 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
   const { t, locale, d } = useI18n();
   const [month, setMonth] = useState(monthOf(todayKey()));
   const [sharing, setSharing] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [barMode, setBarMode] = useState<'sets' | 'volume'>('sets');
+  const [heat, setHeat] = useState<'sets' | 'volume'>('sets');
+  const [allTimeline, setAllTimeline] = useState(false);
   const [range, setRange] = useState<'month' | '3m' | 'all'>('3m');
   const [picked, setPicked] = useState<string[] | null>(null);
   const [allPrs, setAllPrs] = useState(false);
@@ -102,6 +110,8 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
   });
   const toggle = (id: string) => setPicked((p) => { const s = p ?? sel; return s.includes(id) ? s.filter((x) => x !== id) : [...s, id].slice(-5); });
 
+  const timeline = useMemo(() => prTimeline(data), [data]);
+  const lifts = useMemo(() => monthLiftDeltas(data, month, 3), [data, month]);
   const nDays = cur.days.size, pDays = prev.days.size, diff = nDays - pDays;
   const streak = longestStreak([...cur.days.keys()]);
   const topPart = [...cur.parts.entries()].sort((a, b) => b[1].sets - a[1].sets)[0];
@@ -146,7 +156,7 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
     .sort((a, b) => b.value - a.value);
 
 
-  const doShare = async () => {
+  const doShare = async (send: boolean) => {
     setSharing(true);
     try {
       const primary = new Set<Muscle>();
@@ -180,22 +190,47 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
         footer: 'jansonlau0126.github.io/fitness-app · Gym Everyday',
         locale,
       });
-      const blob = await renderShareCard(payload);
-      const mode = await shareOrDownload(blob, `gym-everyday-${month}.png`, t('month.share'));
-      toast(mode === 'shared' ? '✓' : t('day.download'));
+      const style = data.settings.shareStyle;
+      const blob = await renderShareCard(payload, style);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(URL.createObjectURL(blob));
+      if (send) {
+        const mode = await shareOrDownload(blob, `gym-everyday-${month}-${style}.png`, t('month.share'));
+        toast(mode === 'shared' ? '✓' : t('day.download'));
+      }
     } catch {
       toast(t('day.shareFail'));
     } finally { setSharing(false); }
   };
 
+  const tone = pDays === 0 && prev.volume === 0 ? 'new' : (cur.volume - prev.volume) + (nDays - pDays) * 500 > 0 ? 'up' : (cur.volume - prev.volume) + (nDays - pDays) * 500 < 0 ? 'down' : 'flat';
+  const encourage = tone === 'new' ? t('compare.encourageNew') : tone === 'up' ? t('compare.encourageUp') : tone === 'down' ? t('compare.encourageDown') : t('compare.encourageFlat');
+  const cmp = (now: number, before: number) => {
+    if (before <= 0 && now <= 0) return t('compare.flat');
+    if (before <= 0) return t('compare.fresh');
+    const d = now - before;
+    if (d === 0) return t('compare.flat');
+    const pct = Math.round((Math.abs(d) / before) * 100);
+    return d > 0 ? t('compare.up', { n: fmtInt(d), pct }) : t('compare.down', { n: fmtInt(Math.abs(d)), pct });
+  };
+  const shownTimeline = allTimeline ? timeline : timeline.slice(0, 6);
+
   return (
     <div className="page">
-      <header className="page-head"><h1>{t('month.title')}</h1><button className="btn small ghost" disabled={sharing || nDays === 0} onClick={doShare}>{t('month.share')}</button></header>
+      <header className="page-head"><h1>{t('month.title')}</h1></header>
       <div className="datebar">
         <button className="icon-btn" aria-label="Previous month" onClick={() => { setMonth(addMonths(month, -1)); setPicked(null); }}>‹</button>
         <div className="datebar-mid static"><span className="datebar-label">{monthLabel(month)}</span></div>
         <button className="icon-btn" aria-label="Next month" onClick={() => { setMonth(addMonths(month, 1)); setPicked(null); }}>›</button>
       </div>
+      <div className="share-tools">
+        <ShareStyleBar />
+        <div className="row gap">
+          <button className="btn ghost grow" disabled={sharing || nDays === 0} onClick={() => doShare(false)}>{t('share.preview')}</button>
+          <button className="btn primary grow" disabled={sharing || nDays === 0} onClick={() => doShare(true)}>{t('month.share')}</button>
+        </div>
+      </div>
+      {month === monthOf(todayKey()) && <PlanHint date={todayKey()} />}
 
       {streak >= 2 && (
         <div className="streak-banner">
@@ -217,6 +252,51 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
         <Stat label={t('month.volume')} value={cur.volume >= 10000 ? fmt(cur.volume / 1000, 1) + 'k' : fmtInt(cur.volume)} unit="kg" />
       </div>
 
+      <section className="card compare">
+        <h2 className="card-title">{t('compare.title')}</h2>
+        <div className="compare-grid">
+          <div className="compare-card">
+            <div className="stat-label">{t('compare.sessions')}</div>
+            <div className="n">{nDays}</div>
+            <div className={`delta ${nDays > pDays ? 'up' : nDays < pDays ? 'down' : ''}`}>{cmp(nDays, pDays)}</div>
+          </div>
+          <div className="compare-card">
+            <div className="stat-label">{t('compare.volume')}</div>
+            <div className="n">{cur.volume >= 10000 ? fmt(cur.volume / 1000, 1) + 'k' : fmtInt(cur.volume)}</div>
+            <div className={`delta ${cur.volume < prev.volume ? 'down' : cur.volume > prev.volume ? 'up' : ''}`}>{cmp(cur.volume, prev.volume)}</div>
+          </div>
+        </div>
+        <h3 className="compare-sub">{t('compare.topLifts')}</h3>
+        {lifts.length ? (
+          <div className="lift-deltas">
+            {lifts.map((row) => {
+              const ex = m.get(row.exId);
+              const name = exName(ex, locale);
+              const delta = row.prev == null ? null : row.value - row.prev;
+              const deltaText = delta == null ? '' : formatMetric(ex, Math.abs(delta));
+              const line = delta == null
+                ? t('compare.newLift', { name })
+                : delta > 0 ? t('compare.liftUp', { name, delta: deltaText })
+                : delta < 0 ? t('compare.liftDown', { name, delta: deltaText })
+                : t('compare.liftFlat', { name });
+              return (
+                <div className="lift-delta" key={row.exId}>
+                  <div className="grow">
+                    <b>{exName(ex, locale)}</b>
+                    <div className="small muted">{line}</div>
+                  </div>
+                  <div className="lift-nums">
+                    <b className={delta != null && delta > 0 ? 'accent' : ''}>{formatMetric(ex, row.value)}</b>
+                    {row.prev != null && <div className="small muted">{formatMetric(ex, row.prev)}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : <p className="muted small">{t('compare.none')}</p>}
+        <p className="compare-note">{encourage}</p>
+      </section>
+
       <section className="card msgs">
         {msgs.map((t, i) => <p key={i} className="msg">{t}</p>)}
       </section>
@@ -235,9 +315,12 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
       </section>
 
       <section className="card">
-        <h2 className="card-title">{t('month.trainingDays')}</h2>
-        <MonthCalendar month={month} values={cur.days} onPick={openDay} />
-        <div className="legend"><span className="muted small">Less</span><i className="sq l1" /><i className="sq l2" /><i className="sq l3" /><i className="sq l4" /><span className="muted small">More sets</span></div>
+        <div className="card-title-row">
+          <h2 className="card-title">{t('month.trainingDays')}</h2>
+          <Segmented value={heat} onChange={setHeat} options={[{ v: 'sets', label: t('month.heatSets') }, { v: 'volume', label: t('month.heatVolume') }]} />
+        </div>
+        <MonthCalendar month={month} values={heat === 'sets' ? cur.days : cur.volumes} mode={heat} onPick={openDay} />
+        <div className="legend"><span className="muted small">{t('month.heatQuiet')}</span><i className="sq l0" /><i className="sq l1" /><i className="sq l2" /><i className="sq l3" /><i className="sq l4" /><span className="muted small">{t('month.heatHot')}</span></div>
       </section>
 
       <section className="card">
@@ -265,6 +348,12 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
             <div className="legend wrap">{series.map((s) => <span key={s.name}><i className="dot" style={{ background: s.color }} /> {s.name}</span>)}</div>
           </>
         ) : <p className="muted">Log weighted exercises to see a chart.</p>}
+      </section>
+
+      <section className="card">
+        <h2 className="card-title">{t('month.prTimeline')} {timeline.length > 0 && <span className="pill gold">{timeline.length}</span>}</h2>
+        <PrTimelineList events={shownTimeline} />
+        {timeline.length > 6 && <button className="btn ghost small" onClick={() => setAllTimeline(!allTimeline)}>{allTimeline ? t('profile.showLess') : t('profile.showAllPrs', { n: timeline.length })}</button>}
       </section>
 
       <section className="card">
@@ -303,6 +392,12 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
         )}
         <p className="small muted">Standards based on strengthlevel.com data.</p>
       </section>
+      {previewUrl && (
+        <section className="card share-preview-wrap">
+          <h2 className="card-title">{t('month.share')}</h2>
+          <img src={previewUrl} alt="Share card preview" />
+        </section>
+      )}
     </div>
   );
 }
