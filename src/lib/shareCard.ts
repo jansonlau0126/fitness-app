@@ -2,6 +2,7 @@ import type { Exercise, Muscle } from '../data/exercises';
 import { trackingOf } from '../data/exercises';
 import { fmt, fmtInt, fmtSec, type DaySummary } from './calc';
 import type { Locale } from './store';
+import { buildBodyViewSvg } from '../data/bodyAnatomy';
 
 export interface ShareLine {
   name: string;
@@ -31,7 +32,7 @@ export async function renderShareCard(p: SharePayload): Promise<Blob> {
   const PAD = 64;
   const rowH = 128;
   const headerH = 280;
-  const bodyH = 720;
+  const bodyH = 740;
   const statsH = 200;
   const listTop = 56;
   const listH = Math.max(p.lines.length, 1) * rowH + listTop + 40;
@@ -72,12 +73,16 @@ export async function renderShareCard(p: SharePayload): Promise<Blob> {
   ctx.fillText(p.dateLabel, PAD, 240);
 
   const bodyY = headerH + 10;
-  drawAnatomicalBody(ctx, PAD + 20, bodyY, p.primary, p.secondary, false);
-  drawAnatomicalBody(ctx, W / 2 + 20, bodyY, p.primary, p.secondary, true);
+  const bodyDrawH = 640;
+  const bodyDrawW = bodyDrawH * (200 / 500);
+  const frontImg = await svgToImage(buildBodyViewSvg(p.primary, p.secondary, false, 'share-fr'));
+  const backImg = await svgToImage(buildBodyViewSvg(p.primary, p.secondary, true, 'share-bk'));
+  ctx.drawImage(frontImg, PAD + 40, bodyY, bodyDrawW, bodyDrawH);
+  ctx.drawImage(backImg, W / 2 + 40, bodyY, bodyDrawW, bodyDrawH);
   ctx.fillStyle = '#c8b8d8';
   ctx.font = '800 32px system-ui';
-  ctx.fillText('FRONT', PAD + 180, bodyY + 660);
-  ctx.fillText('BACK', W / 2 + 200, bodyY + 660);
+  ctx.fillText('FRONT', PAD + 160, bodyY + bodyDrawH + 48);
+  ctx.fillText('BACK', W / 2 + 180, bodyY + bodyDrawH + 48);
 
   const sy = headerH + bodyH;
   const cards: { l: string; v: string }[] = [
@@ -156,60 +161,18 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
-/** Larger anatomical-ish mini bodies for the share card. */
-function drawAnatomicalBody(ctx: CanvasRenderingContext2D, x: number, y: number, pri: Muscle[], sec: Muscle[], back: boolean) {
-  const ps = new Set(pri), ss = new Set(sec);
-  ctx.save();
-  ctx.translate(x, y);
-  const S = 2.15;
-  ctx.scale(S, S);
-
-  // silhouette with gradient fill simulation
-  ctx.fillStyle = '#2a2038';
-  ctx.beginPath(); ctx.ellipse(60, 24, 18, 22, 0, 0, Math.PI * 2); ctx.fill();
-  roundRect(ctx, 26, 46, 68, 108, 24); ctx.fill(); // torso
-  roundRect(ctx, 2, 54, 28, 86, 14); ctx.fill();
-  roundRect(ctx, 90, 54, 28, 86, 14); ctx.fill();
-  roundRect(ctx, 32, 152, 26, 120, 13); ctx.fill();
-  roundRect(ctx, 62, 152, 26, 120, 13); ctx.fill();
-
-  // subtle highlight on torso
-  ctx.fillStyle = 'rgba(255,255,255,0.06)';
-  roundRect(ctx, 34, 52, 28, 70, 14); ctx.fill();
-
-  const paint = (mx: number, my: number, mw: number, mh: number, m: Muscle, r = 12) => {
-    if (ps.has(m)) {
-      const g = ctx.createLinearGradient(mx, my, mx + mw, my + mh);
-      g.addColorStop(0, '#ffb06a'); g.addColorStop(1, '#ff4f18');
-      ctx.fillStyle = g;
-    } else if (ss.has(m)) {
-      ctx.fillStyle = 'rgba(255,196,160,0.92)';
-    } else return;
-    roundRect(ctx, mx, my, mw, mh, r); ctx.fill();
-  };
-
-  if (!back) {
-    paint(32, 50, 56, 46, 'chest', 16);
-    paint(44, 100, 32, 52, 'abs', 10);
-    paint(4, 62, 24, 44, 'biceps', 12);
-    paint(92, 62, 24, 44, 'biceps', 12);
-    paint(30, 48, 20, 26, 'shoulders', 10);
-    paint(70, 48, 20, 26, 'shoulders', 10);
-    paint(34, 160, 22, 64, 'quads', 11);
-    paint(64, 160, 22, 64, 'quads', 11);
-    paint(34, 232, 22, 38, 'calves', 10);
-    paint(64, 232, 22, 38, 'calves', 10);
-  } else {
-    paint(36, 48, 48, 28, 'traps', 12);
-    paint(32, 72, 56, 64, 'lats', 16);
-    paint(44, 138, 32, 36, 'lower-back', 10);
-    paint(34, 176, 52, 48, 'glutes', 16);
-    paint(34, 226, 22, 50, 'hamstrings', 11);
-    paint(64, 226, 22, 50, 'hamstrings', 11);
-    paint(4, 62, 24, 44, 'triceps', 12);
-    paint(92, 62, 24, 44, 'triceps', 12);
-  }
-  ctx.restore();
+async function svgToImage(svg: string): Promise<HTMLImageElement> {
+  const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.decoding = 'async';
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error('Failed to rasterize body SVG'));
+    img.src = url;
+  });
+  URL.revokeObjectURL(url);
+  return img;
 }
 
 export function buildDayShare(
