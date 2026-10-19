@@ -167,7 +167,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 /* body map */
 .body-map { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .body-view { margin: 0; text-align: center; }
-.body-view svg { width: 100%; height: auto; max-height: 360px; display: block; }
+.body-view svg { width: 100%; height: auto; max-height: 440px; display: block; }
 .body-view figcaption { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-top: 2px; }
 .sil ellipse, .sil path { fill: var(--sil); }
 .line { stroke: var(--mus-line); stroke-width: 1; opacity: .6; }
@@ -400,3 +400,22 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .sync-card .avatar { width:44px; height:44px; border-radius:50%; object-fit:cover; border:2px solid var(--accent); }
 .sync-setup { font-size:13px; line-height:1.45; background: var(--card2); border-radius:12px; padding:12px; border:1px dashed var(--line); }
 .share-preview { width:100%; border-radius:16px; border:1px solid var(--line); margin-top:10px; }
+
+/* Anatomical body map v2 — unmistakable vs flat blocks */
+.body-map.anatomical-v2 { gap: 10px; padding: 4px 0 8px; }
+.body-view.anatomical .mus { fill: #3a3348; stroke: #120c1c; stroke-width: 1.1; }
+.body-view.anatomical .mus.pri {
+  stroke: #ffd4a0 !important; stroke-width: 1.6 !important;
+}
+.body-view.anatomical .mus.sec { stroke: #ffc8a0; stroke-width: 1.2; }
+.body-view.anatomical .mus.focus {
+  stroke: #fff !important; stroke-width: 2.8 !important;
+  filter: drop-shadow(0 0 10px rgba(255,120,50,.9)) !important;
+}
+.body-view.anatomical .line { stroke: rgba(255,200,160,.25); stroke-width: 1.2; }
+.share-preview-wrap { margin-top: 12px; }
+.share-preview-wrap img {
+  width: 100%; border-radius: 16px; border: 1px solid var(--line);
+  box-shadow: 0 12px 40px rgba(0,0,0,.45);
+}
+.share-preview-meta { font-size: 12px; color: var(--muted); margin-top: 6px; text-align: center; }

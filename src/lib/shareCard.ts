@@ -21,130 +21,120 @@ export interface SharePayload {
   locale: Locale;
 }
 
-const W = 1080;
-const PAD = 56;
+/** iPhone-class portrait — unmistakably large on phone gallery. */
+export const SHARE_W = 1242;
+export const SHARE_MIN_H = 2688;
 
-/** High-res vertical share card (1080×~1920+). */
+/** High-res vertical share card (1242×2688+). */
 export async function renderShareCard(p: SharePayload): Promise<Blob> {
-  const rowH = 88;
-  const headerH = 200;
-  const bodyH = 520;
-  const statsH = 160;
-  const listH = Math.max(p.lines.length, 1) * rowH + 80;
-  const H = Math.max(1920, headerH + bodyH + statsH + listH + 140);
+  const W = SHARE_W;
+  const PAD = 64;
+  const rowH = 128;
+  const headerH = 280;
+  const bodyH = 720;
+  const statsH = 200;
+  const listTop = 56;
+  const listH = Math.max(p.lines.length, 1) * rowH + listTop + 40;
+  const H = Math.max(SHARE_MIN_H, headerH + bodyH + statsH + listH + 160);
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
 
-  // night sky bg
   const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, '#1a1030');
-  bg.addColorStop(0.25, '#0a0614');
-  bg.addColorStop(1, '#05040a');
+  bg.addColorStop(0, '#241438');
+  bg.addColorStop(0.18, '#0c0618');
+  bg.addColorStop(1, '#040308');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  // dawn glow
-  const glow = ctx.createRadialGradient(W / 2, 0, 20, W / 2, 80, 520);
-  glow.addColorStop(0, 'rgba(255,140,70,0.35)');
-  glow.addColorStop(0.5, 'rgba(120,60,200,0.12)');
+  const glow = ctx.createRadialGradient(W / 2, 40, 10, W / 2, 120, 700);
+  glow.addColorStop(0, 'rgba(255,150,70,0.45)');
+  glow.addColorStop(0.45, 'rgba(140,60,220,0.16)');
   glow.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, W, 600);
+  ctx.fillRect(0, 0, W, 780);
 
-  // accent bar
-  const grad = ctx.createLinearGradient(0, 0, W, 0);
-  grad.addColorStop(0, '#ffb06a');
-  grad.addColorStop(1, '#ff6a2a');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W, 10);
+  const bar = ctx.createLinearGradient(0, 0, W, 0);
+  bar.addColorStop(0, '#ffc080');
+  bar.addColorStop(1, '#ff5a20');
+  ctx.fillStyle = bar;
+  ctx.fillRect(0, 0, W, 14);
 
-  ctx.fillStyle = '#f3eef8';
-  ctx.font = '850 64px system-ui,sans-serif';
-  ctx.fillText(p.title, PAD, 90);
+  ctx.fillStyle = '#f8f2fc';
+  ctx.font = '900 92px system-ui,-apple-system,sans-serif';
+  ctx.fillText(p.title, PAD, 120);
   ctx.fillStyle = '#ffb06a';
-  ctx.font = '650 28px system-ui,sans-serif';
-  ctx.fillText(p.subtitle || 'Gym everyday, gym today.', PAD, 132);
-  ctx.fillStyle = '#a89bb8';
-  ctx.font = '600 32px system-ui,sans-serif';
-  ctx.fillText(p.dateLabel, PAD, 178);
+  ctx.font = '700 40px system-ui,sans-serif';
+  ctx.fillText(p.subtitle || 'Gym everyday, gym today.', PAD, 180);
+  ctx.fillStyle = '#b8a8c8';
+  ctx.font = '600 36px system-ui,sans-serif';
+  ctx.fillText(p.dateLabel, PAD, 240);
 
-  const bodyY = headerH + 20;
-  drawMiniBody(ctx, PAD + 40, bodyY, p.primary, p.secondary, false);
-  drawMiniBody(ctx, W / 2 + 40, bodyY, p.primary, p.secondary, true);
-  ctx.fillStyle = '#a89bb8';
-  ctx.font = '700 26px system-ui';
-  ctx.fillText('Front', PAD + 160, bodyY + 460);
-  ctx.fillText('Back', W / 2 + 170, bodyY + 460);
+  const bodyY = headerH + 10;
+  drawAnatomicalBody(ctx, PAD + 20, bodyY, p.primary, p.secondary, false);
+  drawAnatomicalBody(ctx, W / 2 + 20, bodyY, p.primary, p.secondary, true);
+  ctx.fillStyle = '#c8b8d8';
+  ctx.font = '800 32px system-ui';
+  ctx.fillText('FRONT', PAD + 180, bodyY + 660);
+  ctx.fillText('BACK', W / 2 + 200, bodyY + 660);
 
   const sy = headerH + bodyH;
   const cards: { l: string; v: string }[] = [
     { l: p.locale === 'zh-TW' ? '動作' : 'Exercises', v: String(p.stats.exercises) },
     { l: p.locale === 'zh-TW' ? '組' : 'Sets', v: String(p.stats.sets) },
-    {
-      l: p.stats.days != null ? (p.locale === 'zh-TW' ? '天' : 'Days') : (p.locale === 'zh-TW' ? '總量' : 'Volume'),
-      v: p.stats.days != null
-        ? String(p.stats.days)
-        : p.stats.volume >= 10000 ? fmt(p.stats.volume / 1000, 1) + 'k' : fmtInt(p.stats.volume),
-    },
   ];
   if (p.stats.days != null) {
-    cards[2] = { l: p.locale === 'zh-TW' ? '天' : 'Days', v: String(p.stats.days) };
-    cards.push({
-      l: p.locale === 'zh-TW' ? '總量' : 'Volume',
-      v: p.stats.volume >= 10000 ? fmt(p.stats.volume / 1000, 1) + 'k' : fmtInt(p.stats.volume),
-    });
+    cards.push({ l: p.locale === 'zh-TW' ? '天' : 'Days', v: String(p.stats.days) });
   }
-  const cardW = p.stats.days != null ? 220 : 300;
-  const gap = 24;
-  const totalW = cards.length * cardW + (cards.length - 1) * gap;
-  const startX = (W - totalW) / 2;
+  cards.push({
+    l: p.locale === 'zh-TW' ? '總量' : 'Volume',
+    v: p.stats.volume >= 10000 ? fmt(p.stats.volume / 1000, 1) + 'k' : fmtInt(p.stats.volume),
+  });
+  const gap = 20;
+  const cardW = Math.floor((W - PAD * 2 - gap * (cards.length - 1)) / cards.length);
   cards.forEach((c, i) => {
-    const x = startX + i * (cardW + gap);
-    ctx.fillStyle = '#14101f';
-    roundRect(ctx, x, sy, cardW, 120, 24);
-    ctx.fill();
-    ctx.strokeStyle = '#2e2640';
-    ctx.lineWidth = 2;
-    roundRect(ctx, x, sy, cardW, 120, 24);
-    ctx.stroke();
-    ctx.fillStyle = '#f3eef8';
-    ctx.font = '850 48px system-ui';
-    ctx.fillText(c.v, x + 24, sy + 62);
-    ctx.fillStyle = '#a89bb8';
-    ctx.font = '650 24px system-ui';
-    ctx.fillText(c.l, x + 24, sy + 96);
+    const x = PAD + i * (cardW + gap);
+    ctx.fillStyle = '#1a1228';
+    roundRect(ctx, x, sy, cardW, 150, 28); ctx.fill();
+    ctx.strokeStyle = '#3a2e50';
+    ctx.lineWidth = 3;
+    roundRect(ctx, x, sy, cardW, 150, 28); ctx.stroke();
+    ctx.fillStyle = '#f8f2fc';
+    ctx.font = '900 56px system-ui';
+    ctx.fillText(c.v, x + 28, sy + 78);
+    ctx.fillStyle = '#a898b8';
+    ctx.font = '700 28px system-ui';
+    ctx.fillText(c.l, x + 28, sy + 120);
   });
 
-  let y = sy + statsH + 20;
-  ctx.fillStyle = '#f3eef8';
-  ctx.font = '800 36px system-ui';
+  let y = sy + statsH + 8;
+  ctx.fillStyle = '#f8f2fc';
+  ctx.font = '900 44px system-ui';
   ctx.fillText(p.locale === 'zh-TW' ? '動作' : 'Exercises', PAD, y);
-  y += 40;
-  for (const line of p.lines.slice(0, 12)) {
-    ctx.fillStyle = '#1c1629';
-    roundRect(ctx, PAD, y, W - PAD * 2, rowH - 12, 18);
-    ctx.fill();
-    ctx.fillStyle = '#f3eef8';
-    ctx.font = '750 32px system-ui';
+  y += listTop;
+  for (const line of p.lines.slice(0, 14)) {
+    ctx.fillStyle = '#1c142c';
+    roundRect(ctx, PAD, y, W - PAD * 2, rowH - 16, 24); ctx.fill();
+    ctx.fillStyle = '#f8f2fc';
+    ctx.font = '800 42px system-ui';
     const name = line.name + (line.pr ? ' 🏆' : '');
-    ctx.fillText(truncate(ctx, name, W - PAD * 2 - 280), PAD + 28, y + 48);
+    ctx.fillText(truncate(ctx, name, W - PAD * 2 - 340), PAD + 36, y + 68);
     ctx.fillStyle = '#ff7a3d';
-    ctx.font = '750 30px system-ui';
+    ctx.font = '800 40px system-ui';
     const tw = ctx.measureText(line.detail).width;
-    ctx.fillText(line.detail, W - PAD - 28 - tw, y + 48);
+    ctx.fillText(line.detail, W - PAD - 36 - tw, y + 68);
     y += rowH;
   }
-  if (p.lines.length > 12) {
-    ctx.fillStyle = '#a89bb8';
-    ctx.font = '600 26px system-ui';
-    ctx.fillText(`+${p.lines.length - 12} more`, PAD, y + 20);
+  if (p.lines.length > 14) {
+    ctx.fillStyle = '#a898b8';
+    ctx.font = '700 32px system-ui';
+    ctx.fillText(`+${p.lines.length - 14} more`, PAD, y + 24);
   }
 
-  ctx.fillStyle = '#6b5f7a';
-  ctx.font = '600 24px system-ui';
-  ctx.fillText(p.footer, PAD, H - 48);
+  ctx.fillStyle = '#7a6a8a';
+  ctx.font = '600 28px system-ui';
+  ctx.fillText(p.footer, PAD, H - 56);
 
   return new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error('blob'))), 'image/png'));
 }
@@ -166,46 +156,58 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
-function drawMiniBody(ctx: CanvasRenderingContext2D, x: number, y: number, pri: Muscle[], sec: Muscle[], back: boolean) {
+/** Larger anatomical-ish mini bodies for the share card. */
+function drawAnatomicalBody(ctx: CanvasRenderingContext2D, x: number, y: number, pri: Muscle[], sec: Muscle[], back: boolean) {
   const ps = new Set(pri), ss = new Set(sec);
-  const scale = 1.7;
   ctx.save();
   ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  ctx.fillStyle = '#1a1428';
-  ctx.beginPath(); ctx.ellipse(60, 22, 16, 20, 0, 0, Math.PI * 2); ctx.fill();
-  roundRect(ctx, 28, 42, 64, 100, 20); ctx.fill();
-  roundRect(ctx, 4, 50, 26, 78, 12); ctx.fill();
-  roundRect(ctx, 90, 50, 26, 78, 12); ctx.fill();
-  roundRect(ctx, 34, 140, 24, 110, 12); ctx.fill();
-  roundRect(ctx, 62, 140, 24, 110, 12); ctx.fill();
+  const S = 2.15;
+  ctx.scale(S, S);
 
-  const paint = (mx: number, my: number, mw: number, mh: number, m: Muscle) => {
-    if (ps.has(m)) ctx.fillStyle = '#ff6a2a';
-    else if (ss.has(m)) ctx.fillStyle = 'rgba(255,196,160,.9)';
-    else return;
-    roundRect(ctx, mx, my, mw, mh, 10); ctx.fill();
+  // silhouette with gradient fill simulation
+  ctx.fillStyle = '#2a2038';
+  ctx.beginPath(); ctx.ellipse(60, 24, 18, 22, 0, 0, Math.PI * 2); ctx.fill();
+  roundRect(ctx, 26, 46, 68, 108, 24); ctx.fill(); // torso
+  roundRect(ctx, 2, 54, 28, 86, 14); ctx.fill();
+  roundRect(ctx, 90, 54, 28, 86, 14); ctx.fill();
+  roundRect(ctx, 32, 152, 26, 120, 13); ctx.fill();
+  roundRect(ctx, 62, 152, 26, 120, 13); ctx.fill();
+
+  // subtle highlight on torso
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  roundRect(ctx, 34, 52, 28, 70, 14); ctx.fill();
+
+  const paint = (mx: number, my: number, mw: number, mh: number, m: Muscle, r = 12) => {
+    if (ps.has(m)) {
+      const g = ctx.createLinearGradient(mx, my, mx + mw, my + mh);
+      g.addColorStop(0, '#ffb06a'); g.addColorStop(1, '#ff4f18');
+      ctx.fillStyle = g;
+    } else if (ss.has(m)) {
+      ctx.fillStyle = 'rgba(255,196,160,0.92)';
+    } else return;
+    roundRect(ctx, mx, my, mw, mh, r); ctx.fill();
   };
+
   if (!back) {
-    paint(34, 48, 52, 40, 'chest');
-    paint(46, 92, 28, 44, 'abs');
-    paint(6, 58, 22, 40, 'biceps');
-    paint(92, 58, 22, 40, 'biceps');
-    paint(36, 148, 20, 56, 'quads');
-    paint(64, 148, 20, 56, 'quads');
-    paint(36, 214, 20, 34, 'calves');
-    paint(64, 214, 20, 34, 'calves');
-    paint(32, 44, 18, 22, 'shoulders');
-    paint(70, 44, 18, 22, 'shoulders');
+    paint(32, 50, 56, 46, 'chest', 16);
+    paint(44, 100, 32, 52, 'abs', 10);
+    paint(4, 62, 24, 44, 'biceps', 12);
+    paint(92, 62, 24, 44, 'biceps', 12);
+    paint(30, 48, 20, 26, 'shoulders', 10);
+    paint(70, 48, 20, 26, 'shoulders', 10);
+    paint(34, 160, 22, 64, 'quads', 11);
+    paint(64, 160, 22, 64, 'quads', 11);
+    paint(34, 232, 22, 38, 'calves', 10);
+    paint(64, 232, 22, 38, 'calves', 10);
   } else {
-    paint(34, 48, 52, 56, 'lats');
-    paint(46, 108, 28, 34, 'lower-back');
-    paint(36, 144, 48, 40, 'glutes');
-    paint(36, 186, 20, 44, 'hamstrings');
-    paint(64, 186, 20, 44, 'hamstrings');
-    paint(6, 58, 22, 40, 'triceps');
-    paint(92, 58, 22, 40, 'triceps');
-    paint(40, 42, 40, 22, 'traps');
+    paint(36, 48, 48, 28, 'traps', 12);
+    paint(32, 72, 56, 64, 'lats', 16);
+    paint(44, 138, 32, 36, 'lower-back', 10);
+    paint(34, 176, 52, 48, 'glutes', 16);
+    paint(34, 226, 22, 50, 'hamstrings', 11);
+    paint(64, 226, 22, 50, 'hamstrings', 11);
+    paint(4, 62, 24, 44, 'triceps', 12);
+    paint(92, 62, 24, 44, 'triceps', 12);
   }
   ctx.restore();
 }
@@ -242,28 +244,14 @@ export function buildDayShare(
 }
 
 export function buildMonthShare(opts: {
-  title: string;
-  dateLabel: string;
-  subtitle?: string;
-  days: number;
-  sets: number;
-  volume: number;
-  lines: ShareLine[];
-  primary: Muscle[];
-  secondary: Muscle[];
-  footer: string;
-  locale: Locale;
+  title: string; dateLabel: string; subtitle?: string; days: number; sets: number; volume: number;
+  lines: ShareLine[]; primary: Muscle[]; secondary: Muscle[]; footer: string; locale: Locale;
 }): SharePayload {
   return {
-    title: opts.title,
-    dateLabel: opts.dateLabel,
-    subtitle: opts.subtitle,
-    primary: opts.primary,
-    secondary: opts.secondary,
-    lines: opts.lines,
+    title: opts.title, dateLabel: opts.dateLabel, subtitle: opts.subtitle,
+    primary: opts.primary, secondary: opts.secondary, lines: opts.lines,
     stats: { sets: opts.sets, volume: opts.volume, exercises: opts.lines.length, days: opts.days },
-    footer: opts.footer,
-    locale: opts.locale,
+    footer: opts.footer, locale: opts.locale,
   };
 }
 
@@ -283,4 +271,12 @@ export async function shareOrDownload(blob: Blob, filename: string, title: strin
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   return 'downloaded';
+}
+
+/** Return pixel size of a PNG blob. */
+export async function pngSize(blob: Blob): Promise<{ w: number; h: number }> {
+  const bmp = await createImageBitmap(blob);
+  const out = { w: bmp.width, h: bmp.height };
+  bmp.close();
+  return out;
 }

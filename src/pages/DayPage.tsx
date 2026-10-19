@@ -5,7 +5,7 @@ import { ExThumb } from '../components/Thumb';
 import type { Muscle } from '../data/exercises';
 import { trackingOf } from '../data/exercises';
 import { daySummary, entryStats, exMap, fmt, fmtInt, fmtSec, formatMetric, prsOn } from '../lib/calc';
-import { buildDayShare, renderShareCard, shareOrDownload } from '../lib/shareCard';
+import { buildDayShare, pngSize, renderShareCard, shareOrDownload } from '../lib/shareCard';
 import { useData } from '../lib/store';
 import { niceDay } from '../lib/date';
 import { exName, exNameEn, muscleLabel, partLabelI18n, useI18n } from '../i18n';
@@ -20,6 +20,8 @@ export default function DayPage({ date, setDate, goLog }: { date: string; setDat
   const [flash, setFlash] = useState<Set<string>>(new Set());
   const listRef = useRef<HTMLDivElement>(null);
   const [sharing, setSharing] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewDim, setPreviewDim] = useState('');
 
   useEffect(() => { setFilter(null); setFlash(new Set()); }, [date]);
 
@@ -65,7 +67,11 @@ export default function DayPage({ date, setDate, goLog }: { date: string; setDat
         nameOf: (ex) => exName(ex, locale),
       });
       const blob = await renderShareCard(payload);
-      const mode = await shareOrDownload(blob, `fitness-${date}.png`, t('day.share'));
+      const dim = await pngSize(blob);
+      setPreviewDim(`${dim.w}×${dim.h}`);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(URL.createObjectURL(blob));
+      const mode = await shareOrDownload(blob, `gym-everyday-${date}.png`, t('day.share'));
       toast(mode === 'shared' ? '✓' : t('day.download'));
     } catch {
       toast(t('day.shareFail'));
@@ -162,6 +168,13 @@ export default function DayPage({ date, setDate, goLog }: { date: string; setDat
             </div>
             <p className="muted small note">{t('day.epleyNote')}</p>
           </section>
+          {previewUrl && (
+            <section className="card share-preview-wrap">
+              <h2 className="card-title">{t('day.share')}</h2>
+              <img src={previewUrl} alt="Share card preview" />
+              <div className="share-preview-meta">{previewDim} PNG</div>
+            </section>
+          )}
         </>
       )}
     </div>
