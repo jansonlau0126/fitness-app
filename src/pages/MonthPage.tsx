@@ -9,6 +9,7 @@ import { Segmented, Stat, toast } from '../components/ui';
 import { BODY_PARTS, KEY_LIFTS, type BodyPart, type Muscle } from '../data/exercises';
 import { bestByExercise, entryStats, exMap, fmt, fmtInt, formatMetric, LEVEL_COLORS, LEVELS, monthLiftDeltas, prTimeline, strengthResults } from '../lib/calc';
 import { addDays, addMonths, daysInMonth, monthLabel, monthOf, monthShort, todayKey, weekKey, weeksInMonth } from '../lib/date';
+import { SHARE_FOOTER } from '../lib/publicSite';
 import { useData, type AppData } from '../lib/store';
 
 const COLORS = ['#ff6b3d', '#60a5fa', '#34d399', '#fbbf24', '#c084fc'];
@@ -187,7 +188,7 @@ export default function MonthPage({ openDay }: { openDay: (d: string) => void })
         lines,
         primary: [...primary],
         secondary: [...secondary],
-        footer: 'jansonlau0126.github.io/fitness-app · Gym Everyday',
+        footer: SHARE_FOOTER,
         locale,
       });
       const style = data.settings.shareStyle;

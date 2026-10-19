@@ -7,6 +7,7 @@ import { shortDate, todayKey } from '../lib/date';
 import { makeDemo } from '../lib/demo';
 import { PHOTO_CREDIT_URL } from '../data/images';
 import { exName, levelLabel, useI18n, useLocaleActions } from '../i18n';
+import { getInstallSnapshot, promptInstall, requestInstallHelp, useInstallSnapshot } from '../lib/install';
 import type { Locale } from '../lib/store';
 import { actions, focusOn, nextFocus, normalize, useData, type PlanFocus, type Theme } from '../lib/store';
 import {
@@ -26,7 +27,18 @@ export default function ProfilePage() {
   const [syncBusy, setSyncBusy] = useState(false);
   const [apiReady, setApiReady] = useState<{ ok: boolean; googleConfigured: boolean } | null>(null);
   const meta = loadSyncMeta();
+  const installSnap = useInstallSnapshot();
   useEffect(() => { health().then(setApiReady).catch(() => setApiReady({ ok: false, googleConfigured: false })); }, []);
+
+  const onInstall = async () => {
+    if (getInstallSnapshot().canPrompt) {
+      const outcome = await promptInstall();
+      if (outcome === 'accepted') toast(t('install.installed'));
+      else if (outcome === 'unavailable') requestInstallHelp();
+      return;
+    }
+    requestInstallHelp();
+  };
 
   const bmi = p.heightCm && p.weightKg ? p.weightKg / (p.heightCm / 100) ** 2 : null;
   const results = strengthResults(data, KEY_LIFTS);
@@ -50,6 +62,18 @@ export default function ProfilePage() {
   return (
     <div className="page">
       <header className="page-head"><h1>{t('profile.title')}</h1></header>
+
+      <section className="card" id="install">
+        <h2 className="card-title">{t('install.title')}</h2>
+        {installSnap.standalone ? (
+          <p className="small muted">{t('install.already')}</p>
+        ) : (
+          <div className="stack">
+            <p className="small muted">{t('install.settingsLong')}</p>
+            <button className="btn primary big" onClick={() => { void onInstall(); }}>{t('install.action')}</button>
+          </div>
+        )}
+      </section>
 
       <section className="card">
         <h2 className="card-title">{t('profile.aboutYou')}</h2>
@@ -212,6 +236,7 @@ export default function ProfilePage() {
         <h2 className="card-title">{t('profile.about')}</h2>
         <p className="small muted">{t('profile.ageNote')}</p>
         <p className="small muted">{t('profile.photoCredit')} <a href={PHOTO_CREDIT_URL} target="_blank" rel="noopener noreferrer">github.com/yuhonas/free-exercise-db</a>. {t('profile.iconsCredit')}</p>
+        <button className="btn ghost big" id="privacy-link" onClick={() => { location.hash = '#/privacy'; }}>{t('privacy.title')}</button>
       </section>
       <p className="center-text small muted">{t('profile.madeFor')}</p>
     </div>

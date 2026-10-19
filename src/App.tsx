@@ -8,10 +8,14 @@ import DayPage from './pages/DayPage';
 import MonthPage from './pages/MonthPage';
 import LibraryPage from './pages/LibraryPage';
 import ProfilePage from './pages/ProfilePage';
+import PrivacyPage from './pages/PrivacyPage';
+import InstallChrome from './components/InstallChrome';
 import { todayKey } from './lib/date';
+import { shouldShowInstallBar, useInstallSnapshot } from './lib/install';
 import { useData } from './lib/store';
 
 type Tab = 'log' | 'day' | 'month' | 'library' | 'profile';
+type Route = Tab | 'privacy';
 const TAB_ICONS: Record<Tab, React.ReactNode> = {
   log: <path d="M9 4h6v2H9zM7 5H5v16h14V5h-2M12 10v6M9 13h6" />,
   day: <><circle cx="12" cy="4.5" r="2" /><path d="M6 8.5h12M12 8.5v5M12 13.5l-3 7M12 13.5l3 7M7 8.5l-1.5 5M17 8.5l1.5 5" /></>,
@@ -21,7 +25,11 @@ const TAB_ICONS: Record<Tab, React.ReactNode> = {
 };
 const TAB_IDS: Tab[] = ['log', 'day', 'month', 'library', 'profile'];
 
-const readHash = (): Tab => { const h = location.hash.replace('#/', '').replace('#', ''); return (TAB_IDS.includes(h as Tab) ? h : 'log') as Tab; };
+const readRoute = (): Route => {
+  const h = location.hash.replace(/^#\/?/, '');
+  if (h === 'privacy') return 'privacy';
+  return (TAB_IDS.includes(h as Tab) ? h : 'log') as Tab;
+};
 
 export default function App() {
   return <I18nProvider><AppInner /></I18nProvider>;
@@ -29,12 +37,20 @@ export default function App() {
 function AppInner() {
   const data = useData();
   const { t } = useI18n();
-  const [tab, setTabState] = useState<Tab>(readHash);
+  const [route, setRouteState] = useState<Route>(readRoute);
   const [date, setDate] = useState(todayKey());
   const [quickEx, setQuickEx] = useState<string | null>(null);
-  const setTab = (t: Tab) => { setTabState(t); history.replaceState(null, '', `#/${t}`); window.scrollTo(0, 0); };
+  const setRoute = (r: Route) => { setRouteState(r); history.replaceState(null, '', `#/${r}`); window.scrollTo(0, 0); };
+  const setTab = (next: Tab) => setRoute(next);
+  const tab: Tab = route === 'privacy' ? 'profile' : route;
+  const installSnap = useInstallSnapshot();
+  const showInstallBar = shouldShowInstallBar(installSnap, data.entries.length);
 
-  useEffect(() => { const f = () => setTabState(readHash()); window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f); }, []);
+  useEffect(() => {
+    const f = () => { setRouteState(readRoute()); window.scrollTo(0, 0); };
+    window.addEventListener('hashchange', f);
+    return () => window.removeEventListener('hashchange', f);
+  }, []);
   useEffect(() => {
     const t = data.settings.theme;
     const apply = () => {
@@ -48,13 +64,17 @@ function AppInner() {
   }, [data.settings.theme]);
 
   return (
-    <div className="app">
+    <div className={showInstallBar ? 'app has-install-bar' : 'app'}>
       <main>
-        {tab === 'log' && <LogPage date={date} setDate={setDate} goSummary={() => setTab('day')} />}
-        {tab === 'day' && <DayPage date={date} setDate={setDate} goLog={() => setTab('log')} />}
-        {tab === 'month' && <MonthPage openDay={(d) => { setDate(d); setTab('day'); }} />}
-        {tab === 'library' && <LibraryPage onLog={(id) => { setDate(todayKey()); setQuickEx(id); }} />}
-        {tab === 'profile' && <ProfilePage />}
+        {route === 'privacy' ? <PrivacyPage onBack={() => setRoute('profile')} /> : (
+          <>
+            {route === 'log' && <LogPage date={date} setDate={setDate} goSummary={() => setTab('day')} />}
+            {route === 'day' && <DayPage date={date} setDate={setDate} goLog={() => setTab('log')} />}
+            {route === 'month' && <MonthPage openDay={(d) => { setDate(d); setTab('day'); }} />}
+            {route === 'library' && <LibraryPage onLog={(id) => { setDate(todayKey()); setQuickEx(id); }} />}
+            {route === 'profile' && <ProfilePage />}
+          </>
+        )}
       </main>
       <nav className="tabbar" aria-label="Main">
         {TAB_IDS.map((id) => (
@@ -66,6 +86,7 @@ function AppInner() {
       </nav>
       {quickEx && <EntryEditor entry={null} date={todayKey()} presetEx={quickEx} onClose={() => { setQuickEx(null); }} />}
       <LightboxHost />
+      <InstallChrome entryCount={data.entries.length} />
       <Hosts />
     </div>
   );

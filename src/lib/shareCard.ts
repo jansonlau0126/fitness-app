@@ -162,7 +162,7 @@ async function renderNeon(p: SharePayload): Promise<Blob> {
 
   ctx.fillStyle = '#7a6a8a';
   ctx.font = '600 28px system-ui';
-  ctx.fillText(p.footer, PAD, H - 56);
+  ctx.fillText(truncate(ctx, p.footer, W - PAD * 2), PAD, H - 56);
 
   return canvasBlob(canvas);
 }

@@ -62,6 +62,7 @@ export function nextFocus(f: PlanFocus): PlanFocus {
   return PLAN_CYCLE[(i + 1) % PLAN_CYCLE.length];
 }
 
+// Keep this key. Renaming it would drop existing workouts unless we migrate them.
 const KEY = 'janson-fit-v1';
 
 function detectLocale(): Locale {

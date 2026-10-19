@@ -2,9 +2,9 @@
 
 **Gym everyday, gym today.**
 
-A simple gym log for Janson — inspired by the 4am grind. Track sets, see which muscles you hit, compare to strength standards, and keep a monthly streak.
+A late-night gym log. Track sets, see which muscles you hit, compare to strength standards, and keep a monthly streak.
 
-Live: https://jansonlau0126.github.io/fitness-app/
+Official site: https://mypeanutbutterjam-netizen.github.io/gym-everyday/
 
 ## Features
 - Daily workout log (weight × reps, bodyweight reps, timed holds)
@@ -15,7 +15,9 @@ Live: https://jansonlau0126.github.io/fitness-app/
 - Month heat map, badges, streaks, compare vs last month
 - Share cards: Neon, Poster, and stats Grid (day / month)
 - English + 繁體中文
-- Offline PWA + optional Google cloud sync (Cloudflare Workers + D1)
+- Offline PWA. Install from Chrome/Edge, or Share → Add to Home Screen on iPhone Safari
+- Optional Google cloud sync (Cloudflare Workers + D1). Not enabled on the public site
+- Privacy: local-first. In the app open Profile → Privacy, or open `privacy.html` on the site
 
 ## Dev
 ```bash
@@ -24,7 +26,11 @@ npm run dev
 npm run build
 ```
 
-## Cloud sync
-API: `https://gym-everyday-api.jansonlau.workers.dev`
+Vite `base` is `./`, so one build works on a GitHub Pages project site at any subpath until cutover. Do not hardcode `/fitness-app/` as the only base.
 
-Requires a Google OAuth **Web** client ID (authorized origins: this GitHub Pages URL + localhost). Set as Worker secret `GOOGLE_CLIENT_ID` and Vite env `VITE_GOOGLE_CLIENT_ID`.
+## Cloud sync
+Optional. The public site does not ship a Google OAuth client, so cloud sync stays off there.
+
+Current API host: `https://gym-everyday-api.jansonlau.workers.dev`
+
+To turn sync on for a deployment, create a Google OAuth **Web** client ID whose authorized JavaScript origins include that site and localhost. Set it as Worker secret `GOOGLE_CLIENT_ID` and Vite env `VITE_GOOGLE_CLIENT_ID`.
